@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Case Details - Legal Case Management</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>Legal Case Management - Lawyer Portal</h1>
+            <nav class="nav-links">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="consultation-requests.html">Requests</a>
+                <a href="cases.html">Cases</a>
+                <a href="profile.html">Profile</a>
+                <button class="btn btn-secondary" onclick="handleLogout()">Logout</button>
+            </nav>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <div id="case-overview">
+                <p class="loading">Loading case details...</p>
+            </div>
+
+            <div class="btn-group" id="case-actions" style="margin-top: 15px; display: none;">
+                <button class="btn btn-danger" onclick="unclaimCase()">Un-claim Case (Return to Pool)</button>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" data-tab="overview">Overview</button>
+                <button class="tab" data-tab="appointments">Appointments</button>
+                <button class="tab" data-tab="updates">Case Updates</button>
+                <button class="tab" data-tab="messages">Messages</button>
+                <button class="tab" data-tab="documents">Documents</button>
+                <button class="tab" data-tab="followups">Follow-Ups</button>
+            </div>
+
+            <!-- Overview Tab -->
+            <div id="overview" class="tab-content active">
+                <div id="overview-content"></div>
+            </div>
+
+            <!-- Appointments Tab -->
+            <div id="appointments" class="tab-content">
+                <h3>Manage Appointments</h3>
+                <p class="text-muted">Appointment requests are handled in the Consultation Requests page</p>
+            </div>
+
+            <!-- Updates Tab -->
+            <div id="updates" class="tab-content">
+                <h3>Add Case Update</h3>
+                <form id="update-form">
+                    <div class="form-group">
+                        <label for="new-status">New Status</label>
+                        <select id="new-status" required>
+                            <option value="">Select status...</option>
+                            <option value="in_review">In Review</option>
+                            <option value="active">Active</option>
+                            <option value="closed">Closed</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="notes">Notes</label>
+                        <textarea id="notes" placeholder="Add legal notes or advice..."></textarea>
+                    </div>
+                    <div class="btn-group">
+                        <button type="submit" class="btn btn-primary">Update Case (State Machine)</button>
+                        <button type="button" class="btn btn-danger" onclick="undoLastUpdate()">Undo Last Update
+                            (Stack)</button>
+                    </div>
+                </form>
+                <div id="update-message"></div>
+
+                <h3 class="mt-2">Update History</h3>
+                <div id="updates-content">
+                    <p class="text-muted">No updates yet</p>
+                </div>
+            </div>
+
+            <!-- Messages Tab -->
+            <div id="messages" class="tab-content">
+                <div class="messages-container" id="messages-list"></div>
+                <form id="message-form">
+                    <div class="form-group">
+                        <textarea id="message-content" placeholder="Reply to client..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Send Message</button>
+                </form>
+            </div>
+
+            <!-- Documents Tab -->
+            <div id="documents" class="tab-content">
+                <form id="document-form" class="mb-2">
+                    <div class="form-group">
+                        <label for="filename">Document Name</label>
+                        <input type="text" id="filename" placeholder="e.g., legal_advice.pdf" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Upload Document (Simulated)</button>
+                </form>
+                <ul id="documents-list" class="document-list"></ul>
+            </div>
+
+            <!-- Follow-Ups Tab -->
+            <div id="followups" class="tab-content">
+                <h3>Schedule Follow-Up</h3>
+                <form id="followup-form">
+                    <div class="form-group">
+                        <label for="followup-type">Type</label>
+                        <select id="followup-type" required>
+                            <option value="consultation">Consultation</option>
+                            <option value="hearing">Hearing</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="followup-date">Scheduled Date</label>
+                        <input type="datetime-local" id="followup-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="followup-notes">Notes</label>
+                        <textarea id="followup-notes"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Schedule Follow-Up (Queue)</button>
+                </form>
+                <div id="followup-message"></div>
+
+                <h3 class="mt-2">Scheduled Follow-Ups</h3>
+                <div id="followups-content">
+                    <p class="text-muted">No follow-ups scheduled</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../app.js"></script>
+    <script>
+        if (!requireAuth('lawyer')) {
+            // Redirected
+        }
+
+        // Update navigation
+        document.querySelector('.nav-links').innerHTML = `
+            <a href="dashboard.html">Dashboard</a>
+            <a href="available-cases.html">Available Cases</a>
+            <a href="pending-requests.html">My Requests</a>
+            <a href="cases.html">My Cases</a>
+            <a href="profile.html">Profile</a>
+            <button class="btn btn-secondary" onclick="handleLogout()">Logout</button>
+        `;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const caseId = urlParams.get('id');
+
+        if (!caseId) {
+            window.location.href = 'cases.html';
+        }
+
+        let caseData = {};
+
+        async function unclaimCase() {
+            if (!confirm('Un-claim this case? It will be returned to the available cases pool.')) return;
+
+            try {
+                await API.unclaimCase(caseId);
+                showAlert('Case returned to pool', 'success');
+                setTimeout(() => {
+                    window.location.href = 'cases.html';
+                }, 1000);
+            } catch (error) {
+                showAlert('Error un-claiming case: ' + error.message, 'error');
+            }
+        }
+
+        async function loadCaseDetails() {
+            try {
+                const data = await API.getLawyerCaseDetails(caseId);
+                caseData = data.case;
+
+                // Overview
+                document.getElementById('case-overview').innerHTML = `
+                    <h2>${caseData.case_id} 
+                        ${caseData.urgency ? '<span class="urgent-badge">Urgent - Priority Queue</span>' : ''}
+                    </h2>
+                `;
+
+                // Show unclaim button
+                document.getElementById('case-actions').style.display = 'flex';
+
+                document.getElementById('overview-content').innerHTML = `
+                    <p><strong>Case Type:</strong> ${caseData.case_type}</p>
+                    <p><strong>Current Status:</strong> <span class="case-status status-${caseData.status}">${formatStatus(caseData.status)}</span></p>
+                    <p><strong>Client ID:</strong> ${caseData.client_id}</p>
+                    <p><strong>Description:</strong></p>
+                    <p>${caseData.description}</p>
+                    <p><strong>Created:</strong> ${formatDate(caseData.created_at)}</p>
+                    <p><strong>Last Updated:</strong> ${formatDate(caseData.updated_at)}</p>
+                `;
+
+                // Updates
+                if (data.case.updates && data.case.updates.length > 0) {
+                    document.getElementById('updates-content').innerHTML = data.case.updates.reverse().map(update => `
+                        <div class="card">
+                            <p><strong>Status Changed:</strong> ${update.old_status} → ${update.new_status}</p>
+                            <p><strong>Notes:</strong> ${update.notes || 'No notes'}</p>
+                            <p class="text-muted" style="font-size: 12px;">${formatDate(update.timestamp)}</p>
+                        </div>
+                    `).join('');
+                }
+
+                // Messages
+                loadMessages(data.messages);
+
+                // Documents
+                loadDocuments(data.documents);
+
+                // Follow-ups
+                if (data.followups && data.followups.length > 0) {
+                    document.getElementById('followups-content').innerHTML = data.followups.map(f => `
+                        <div class="card">
+                            <p><strong>Type:</strong> ${f.type}</p>
+                            <p><strong>Scheduled:</strong> ${formatDate(f.scheduled_date)}</p>
+                            <p><strong>Notes:</strong> ${f.notes || 'No notes'}</p>
+                        </div>
+                    `).join('');
+                }
+
+            } catch (error) {
+                console.error('Error loading case:', error);
+                showAlert('Error loading case: ' + error.message, 'error');
+            }
+        }
+
+        function loadMessages(messages) {
+            const messagesDiv = document.getElementById('messages-list');
+            if (messages && messages.length > 0) {
+                messagesDiv.innerHTML = messages.map(m => `
+                    <div class="message ${m.sender_role}">
+                        <div class="message-sender">${m.sender_role === 'lawyer' ? 'You' : 'Client'}</div>
+                        <div class="message-content">${m.content}</div>
+                        <div class="message-time">${formatDate(m.timestamp)}</div>
+                    </div>
+                `).join('');
+            } else {
+                messagesDiv.innerHTML = '<p class="text-muted">No messages yet</p>';
+            }
+        }
+
+        function loadDocuments(documents) {
+            const docsDiv = document.getElementById('documents-list');
+            if (documents && documents.length > 0) {
+                docsDiv.innerHTML = documents.map(d => `
+                    <li class="document-item">
+                        <div>
+                            <div class="document-name">${d.filename}</div>
+                            <div class="document-meta">Uploaded: ${formatDate(d.uploaded_at)}</div>
+                        </div>
+                        <button class="btn btn-primary" onclick="alert('Download: ${d.filename}')">Download</button>
+                    </li>
+                `).join('');
+            } else {
+                docsDiv.innerHTML = '<p class="text-muted">No documents uploaded</p>';
+            }
+        }
+
+        // Update form
+        document.getElementById('update-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const status = document.getElementById('new-status').value;
+            const notes = document.getElementById('notes').value;
+            const messageDiv = document.getElementById('update-message');
+
+            try {
+                await API.updateCase(caseId, status, notes);
+                messageDiv.innerHTML = '<div class="alert alert-success">Case updated! (State machine validated)</div>';
+                document.getElementById('update-form').reset();
+                loadCaseDetails(); // Reload
+            } catch (error) {
+                messageDiv.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+            }
+        });
+
+        // Undo function
+        async function undoLastUpdate() {
+            if (!confirm('Undo the last case update?')) return;
+
+            try {
+                await API.undoCaseUpdate(caseId);
+                showAlert('Last update undone! (Stack pop)', 'success');
+                loadCaseDetails();
+            } catch (error) {
+                showAlert('Error undoing: ' + error.message, 'error');
+            }
+        }
+
+        // Message form
+        document.getElementById('message-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const content = document.getElementById('message-content').value;
+
+            try {
+                await API.sendMessage(caseId, content);
+                document.getElementById('message-content').value = '';
+                const data = await API.getLawyerCaseDetails(caseId);
+                loadMessages(data.messages);
+            } catch (error) {
+                showAlert('Error sending message: ' + error.message, 'error');
+            }
+        });
+
+        // Document form
+        document.getElementById('document-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const filename = document.getElementById('filename').value;
+
+            try {
+                await API.uploadDocument(caseId, filename, `/uploads/${filename}`);
+                showAlert('Document uploaded!', 'success');
+                document.getElementById('filename').value = '';
+                const data = await API.getLawyerCaseDetails(caseId);
+                loadDocuments(data.documents);
+            } catch (error) {
+                showAlert('Error uploading: ' + error.message, 'error');
+            }
+        });
+
+        // Follow-up form
+        document.getElementById('followup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const type = document.getElementById('followup-type').value;
+            const date = document.getElementById('followup-date').value;
+            const notes = document.getElementById('followup-notes').value;
+            const messageDiv = document.getElementById('followup-message');
+
+            try {
+                await API.scheduleFollowup(caseId, type, new Date(date).toISOString(), notes);
+                messageDiv.innerHTML = '<div class="alert alert-success">Follow-up scheduled! (Added to queue)</div>';
+                document.getElementById('followup-form').reset();
+                loadCaseDetails();
+            } catch (error) {
+                messageDiv.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+            }
+        });
+
+        // Initialize
+        initTabs();
+        loadCaseDetails();
+    </script>
+</body>
+
+</html>

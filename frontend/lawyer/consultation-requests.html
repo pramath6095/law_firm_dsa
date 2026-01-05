@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consultation Requests - Legal Case Management</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>Legal Case Management - Lawyer Portal</h1>
+            <nav class="nav-links">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="available-cases.html">Available Cases</a>
+                <a href="pending-requests.html">My Requests</a>
+                <a href="cases.html">My Cases</a>
+                <a href="profile.html">Profile</a>
+                <button class="btn btn-secondary" onclick="handleLogout()">Logout</button>
+            </nav>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h2>Consultation Requests</h2>
+            <p class="text-muted">Urgent requests are processed first (Priority Queue)</p>
+
+            <div id="requests-list">
+                <p class="loading">Loading requests...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="../app.js"></script>
+    <script>
+        if (!requireAuth('lawyer')) {
+            // Redirected
+        }
+
+        async function loadRequests() {
+            try {
+                const data = await API.getConsultationRequests();
+                const requestsDiv = document.getElementById('requests-list');
+
+                if (data.requests && data.requests.length > 0) {
+                    requestsDiv.innerHTML = data.requests.map(req => `
+                        <div class="card ${req.urgency ? 'urgent' : ''}" style="border-left: 4px solid ${req.urgency ? 'var(--urgent-color)' : 'var(--border-color)'}">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div>
+                                    <p><strong>Appointment ID:</strong> ${req.appointment_id}</p>
+                                    <p><strong>Case ID:</strong> ${req.case_id}</p>
+                                    <p><strong>Preferred Date:</strong> ${formatDate(req.preferred_datetime)}</p>
+                                    ${req.urgency ? '<span class="urgent-badge">Urgent - Priority Queue</span>' : '<span class="text-muted">Normal Queue</span>'}
+                                </div>
+                                <div class="btn-group" style="flex-direction: column;">
+                                    <button class="btn btn-success" onclick="approveRequest('${req.appointment_id}', '${req.preferred_datetime}')">Approve</button>
+                                    <button class="btn btn-secondary" onclick="rescheduleRequest('${req.appointment_id}')">Reschedule</button>
+                                    <button class="btn btn-danger" onclick="rejectRequest('${req.appointment_id}')">Reject</button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    requestsDiv.innerHTML = `
+                        <div class="empty-state">
+                            <p>No pending requests</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading requests:', error);
+                showAlert('Error loading requests: ' + error.message, 'error');
+            }
+        }
+
+        async function approveRequest(appointmentId, preferredDatetime) {
+            try {
+                await API.approveAppointment(appointmentId, preferredDatetime);
+                showAlert('Appointment approved!', 'success');
+                loadRequests(); // Reload
+            } catch (error) {
+                showAlert('Error approving appointment: ' + error.message, 'error');
+            }
+        }
+
+        async function rescheduleRequest(appointmentId) {
+            const newDatetime = prompt('Enter new date and time (YYYY-MM-DD HH:MM):');
+            if (!newDatetime) return;
+
+            try {
+                const isoDatetime = new Date(newDatetime).toISOString();
+                await API.rescheduleAppointment(appointmentId, isoDatetime);
+                showAlert('Appointment rescheduled!', 'success');
+                loadRequests();
+            } catch (error) {
+                showAlert('Error rescheduling: ' + error.message, 'error');
+            }
+        }
+
+        async function rejectRequest(appointmentId) {
+            const reason = prompt('Enter rejection reason:');
+            if (!reason) return;
+
+            try {
+                await API.rejectAppointment(appointmentId, reason);
+                showAlert('Appointment rejected', 'success');
+                loadRequests();
+            } catch (error) {
+                showAlert('Error rejecting: ' + error.message, 'error');
+            }
+        }
+
+        loadRequests();
+    </script>
+</body>
+
+</html>

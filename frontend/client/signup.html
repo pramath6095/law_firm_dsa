@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Sign Up - Legal Case Management</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+
+<body>
+    <div class="auth-page">
+        <div class="auth-card">
+            <h1>Create Account</h1>
+
+            <div id="error-message"></div>
+
+            <form id="signup-form">
+                <div class="form-group">
+                    <label for="name">Full Name</label>
+                    <input type="text" id="name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Phone Number</label>
+                    <input type="tel" id="phone" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+            </form>
+
+            <p class="text-center mt-2">
+                Already have an account? <a href="login.html">Login</a>
+            </p>
+        </div>
+    </div>
+
+    <script src="../app.js"></script>
+    <script>
+        document.getElementById('signup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const phone = document.getElementById('phone').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('error-message');
+
+            errorDiv.innerHTML = '';
+
+            try {
+                const response = await API.signup(name, email, phone, password);
+                Session.setUser(response.user);
+                window.location.href = 'dashboard.html';
+            } catch (error) {
+                errorDiv.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+            }
+        });
+    </script>
+</body>
+
+</html>

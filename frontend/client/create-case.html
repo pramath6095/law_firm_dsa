@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create New Case - Legal Case Management</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>Legal Case Management</h1>
+            <nav class="nav-links">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="my-cases.html">My Cases</a>
+                <a href="profile.html">Profile</a>
+                <button class="btn btn-secondary" onclick="handleLogout()">Logout</button>
+            </nav>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card" style="max-width: 600px; margin: 0 auto;">
+            <h2>Create New Case</h2>
+
+            <div id="message-area"></div>
+
+            <form id="create-case-form">
+                <div class="form-group">
+                    <label for="case-type">Case Type *</label>
+                    <select id="case-type" required>
+                        <option value="">Select type...</option>
+                        <option value="Civil">Civil Law</option>
+                        <option value="Criminal">Criminal Law</option>
+                        <option value="Family">Family Law</option>
+                        <option value="Corporate">Corporate Law</option>
+                        <option value="Property">Property Law</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Case Description *</label>
+                    <textarea id="description" required placeholder="Describe your legal issue in detail..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="urgency">
+                        <label for="urgency" style="margin-bottom: 0;">
+                            Mark as Urgent (will be prioritized in queue)
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="lawyer-selection">Assign To *</label>
+                    <select id="lawyer-selection" required>
+                        <option value="general">Send to All Lawyers (Available Cases Pool)</option>
+                    </select>
+                    <p class="text-muted" style="font-size: 12px; margin-top: 5px;">
+                        Send to all lawyers or select a specific lawyer for direct assignment
+                    </p>
+                </div>
+
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">Create Case</button>
+                    <a href="my-cases.html" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="../app.js"></script>
+    <script>
+        if (!requireAuth('client')) {
+            // Redirected
+        }
+
+        // Load lawyers for selection
+        async function loadLawyers() {
+            try {
+                const data = await API.getAllLawyers();
+                const lawyerSelect = document.getElementById('lawyer-selection');
+
+                // Add lawyer options
+                data.lawyers.forEach(lawyer => {
+                    const option = document.createElement('option');
+                    option.value = lawyer.user_id;
+                    option.textContent = `${lawyer.name} (Direct Assignment)`;
+                    lawyerSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading lawyers:', error);
+            }
+        }
+
+        loadLawyers();
+
+        document.getElementById('create-case-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const caseType = document.getElementById('case-type').value;
+            const description = document.getElementById('description').value;
+            const urgency = document.getElementById('urgency').checked;
+            const lawyerSelection = document.getElementById('lawyer-selection').value;
+            const messageArea = document.getElementById('message-area');
+
+            messageArea.innerHTML = '';
+
+            try {
+                const caseData = {
+                    case_type: caseType,
+                    description: description,
+                    urgency: urgency
+                };
+
+                // Add assignment type
+                if (lawyerSelection === 'general') {
+                    caseData.assignment_type = 'general';
+                } else {
+                    caseData.assignment_type = 'direct';
+                    caseData.lawyer_id = lawyerSelection;
+                }
+
+                const response = await API.createCase(caseData);
+
+                showAlert('Case created successfully!', 'success');
+
+                // Redirect to my cases
+                setTimeout(() => {
+                    window.location.href = 'my-cases.html';
+                }, 1000);
+
+            } catch (error) {
+                messageArea.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+            }
+        });
+    </script>
+</body>
+
+</html>

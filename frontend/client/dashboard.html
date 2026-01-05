@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Legal Case Management</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>Legal Case Management</h1>
+            <nav class="nav-links">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="my-cases.html">My Cases</a>
+                <a href="profile.html">Profile</a>
+                <button class="btn btn-secondary" onclick="handleLogout()">Logout</button>
+            </nav>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="user-welcome"></div>
+
+        <div class="card-grid">
+            <!-- Active Cases Card -->
+            <div class="card">
+                <h2>Active Cases</h2>
+                <div id="active-cases">
+                    <p class="loading">Loading...</p>
+                </div>
+                <a href="my-cases.html" class="btn btn-primary mt-2">View All Cases</a>
+            </div>
+
+            <!-- Next Appointment Card -->
+            <div class="card">
+                <h2>Next Appointment</h2>
+                <div id="next-appointment">
+                    <p class="text-muted">No upcoming appointments</p>
+                </div>
+            </div>
+
+            <!-- Notifications Card -->
+            <div class="card">
+                <h2>Notifications <span id="unread-badge"></span></h2>
+                <div id="notifications">
+                    <p class="text-muted">No new notifications</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-2">
+            <a href="create-case.html" class="btn btn-primary">Create New Case</a>
+        </div>
+    </div>
+
+    <script src="../app.js"></script>
+    <script>
+        // Auth check
+        if (!requireAuth('client')) {
+            // Redirected by requireAuth
+        }
+
+        const user = Session.getUser();
+
+        // Display welcome message
+        document.getElementById('user-welcome').innerHTML = `
+            <h2>Welcome, ${user.name}</h2>
+            <p class="text-muted">Client Dashboard</p>
+        `;
+
+        // Load dashboard data
+        async function loadDashboard() {
+            try {
+                const data = await API.getClientDashboard();
+
+                // Display active cases
+                const activeCasesDiv = document.getElementById('active-cases');
+                if (data.active_cases && data.active_cases.length > 0) {
+                    activeCasesDiv.innerHTML = data.active_cases.map(c => `
+                        <div class="case-item ${c.urgency ? 'urgent' : ''}" onclick="window.location.href='case-details.html?id=${c.case_id}'">
+                            <div class="case-id">${c.case_id}</div>
+                            <div class="case-type">${c.case_type}</div>
+                            <span class="case-status status-${c.status}">${formatStatus(c.status)}</span>
+                            ${c.urgency ? '<span class="urgent-badge">Urgent</span>' : ''}
+                        </div>
+                    `).join('');
+                } else {
+                    activeCasesDiv.innerHTML = '<p class="text-muted">No active cases</p>';
+                }
+
+                // Display unread notifications
+                if (data.unread_notifications > 0) {
+                    document.getElementById('unread-badge').innerHTML =
+                        `<span class="notification-badge">${data.unread_notifications}</span>`;
+                }
+
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                showAlert('Error loading dashboard: ' + error.message, 'error');
+            }
+        }
+
+        loadDashboard();
+    </script>
+</body>
+
+</html>

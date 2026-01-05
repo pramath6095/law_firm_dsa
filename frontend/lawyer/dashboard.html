@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lawyer Dashboard - Legal Case Management</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>Legal Case Management - Lawyer Portal</h1>
+            <nav class="nav-links">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="available-cases.html">Available Cases</a>
+                <a href="pending-requests.html">My Requests</a>
+                <a href="cases.html">My Cases</a>
+                <a href="profile.html">Profile</a>
+                <button class="btn btn-secondary" onclick="handleLogout()">Logout</button>
+            </nav>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="user-welcome"></div>
+
+        <div class="card-grid">
+            <!-- Statistics Cards -->
+            <div class="card">
+                <h2>Total Cases</h2>
+                <p id="total-cases" style="font-size: 2rem; font-weight: bold; color: var(--primary-color);">-</p>
+            </div>
+
+            <div class="card">
+                <h2>Urgent Cases</h2>
+                <p id="urgent-cases" style="font-size: 2rem; font-weight: bold; color: var(--urgent-color);">-</p>
+            </div>
+
+            <div class="card">
+                <h2>Pending Requests</h2>
+                <p id="pending-requests" style="font-size: 2rem; font-weight: bold; color: var(--warning-color);">-</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Urgent Cases Requiring Attention</h2>
+            <div id="urgent-cases-list">
+                <p class="loading">Loading...</p>
+            </div>
+            <a href="cases.html" class="btn btn-primary mt-2">View All Cases</a>
+        </div>
+
+        <div class="card">
+            <h2>Quick Actions</h2>
+            <div class="btn-group">
+                <a href="consultation-requests.html" class="btn btn-primary">Review Appointment Requests</a>
+                <a href="cases.html" class="btn btn-secondary">Manage Cases</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="../app.js"></script>
+    <script>
+        if (!requireAuth('lawyer')) {
+            // Redirected
+        }
+
+        const user = Session.getUser();
+
+        document.getElementById('user-welcome').innerHTML = `
+            <h2>Welcome, ${user.name}</h2>
+            <p class="text-muted">Lawyer Dashboard</p>
+        `;
+
+        async function loadDashboard() {
+            try {
+                const data = await API.getLawyerDashboard();
+
+                document.getElementById('total-cases').textContent = data.total_cases || 0;
+                document.getElementById('urgent-cases').textContent = data.urgent_cases_count || 0;
+                document.getElementById('pending-requests').textContent = data.pending_requests_count || 0;
+
+                // Display urgent cases
+                const urgentDiv = document.getElementById('urgent-cases-list');
+                if (data.urgent_cases && data.urgent_cases.length > 0) {
+                    urgentDiv.innerHTML = data.urgent_cases.map(c => `
+                        <div class="case-item urgent" onclick="window.location.href='case-details.html?id=${c.case_id}'">
+                            <div class="case-id">${c.case_id} <span class="urgent-badge">Urgent</span></div>
+                            <div class="case-type">${c.case_type}</div>
+                            <span class="case-status status-${c.status}">${formatStatus(c.status)}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    urgentDiv.innerHTML = '<p class="text-muted">No urgent cases</p>';
+                }
+
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                showAlert('Error loading dashboard: ' + error.message, 'error');
+            }
+        }
+
+        loadDashboard();
+    </script>
+</body>
+
+</html>

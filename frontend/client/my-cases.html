@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Cases - Legal Case Management</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>Legal Case Management</h1>
+            <nav class="nav-links">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="my-cases.html">My Cases</a>
+                <a href="profile.html">Profile</a>
+                <button class="btn btn-secondary" onclick="handleLogout()">Logout</button>
+            </nav>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>My Cases</h2>
+                <a href="create-case.html" class="btn btn-primary">Create New Case</a>
+            </div>
+
+            <div id="cases-list">
+                <p class="loading">Loading cases...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="../app.js"></script>
+    <script>
+        if (!requireAuth('client')) {
+            // Redirected
+        }
+
+        async function loadCases() {
+            try {
+                const data = await API.getClientCases();
+                const casesDiv = document.getElementById('cases-list');
+
+                if (data.cases && data.cases.length > 0) {
+                    casesDiv.innerHTML = data.cases.map(c => `
+                        <div class="case-item ${c.urgency ? 'urgent' : ''}" 
+                             onclick="window.location.href='case-details.html?id=${c.case_id}'">
+                            <div class="case-id">${c.case_id}</div>
+                            <div class="case-type">${c.case_type}</div>
+                            <div class="case-status">
+                                <span class="case-status status-${c.status}">${formatStatus(c.status)}</span>
+                                ${c.urgency ? '<span class="urgent-badge">Urgent</span>' : ''}
+                            </div>
+                            <p class="text-muted" style="margin-top: 8px; font-size: 13px;">
+                                Created: ${formatDate(c.created_at)}
+                            </p>
+                        </div>
+                    `).join('');
+                } else {
+                    casesDiv.innerHTML = `
+                        <div class="empty-state">
+                            <p>No cases yet</p>
+                            <a href="create-case.html" class="btn btn-primary mt-2">Create Your First Case</a>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading cases:', error);
+                showAlert('Error loading cases: ' + error.message, 'error');
+            }
+        }
+
+        loadCases();
+    </script>
+</body>
+
+</html>
