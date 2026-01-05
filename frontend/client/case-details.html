@@ -123,6 +123,7 @@
                 document.getElementById('overview-content').innerHTML = `
                     <p><strong>Case Type:</strong> ${caseData.case_type}</p>
                     <p><strong>Status:</strong> <span class="case-status status-${caseData.status}">${formatStatus(caseData.status)}</span></p>
+                    <p><strong>Assigned Lawyer:</strong> ${caseData.lawyer_id || 'Waiting for lawyer to claim'}</p>
                     <p><strong>Description:</strong></p>
                     <p>${caseData.description}</p>
                     <p><strong>Created:</strong> ${formatDate(caseData.created_at)}</p>
