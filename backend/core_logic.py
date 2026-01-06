@@ -458,16 +458,18 @@ class AvailableCasesPool:
             return False, "Case not found"
         
         assignment = self.case_assignments[case_id]
-        if assignment['status'] != 'available':
+        if assignment['status'] not in ['available', 'rejected_then_available']:
             return False, "Case not available"
         
         # Find and remove from pool
         case_found = False
+        claimed_case = None
         
         # Try urgent pool
         urgent_cases = self.urgent_pool.get_all()
         for case in urgent_cases:
             if case['case_id'] == case_id:
+                claimed_case = case
                 # Rebuild pool without this case
                 temp_pool = PriorityQueue()
                 for c in urgent_cases:
@@ -482,6 +484,7 @@ class AvailableCasesPool:
             normal_cases = self.normal_pool.get_all()
             for case in normal_cases:
                 if case['case_id'] == case_id:
+                    claimed_case = case
                     # Rebuild pool without this case
                     temp_pool = Queue()
                     for c in normal_cases:

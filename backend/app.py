@@ -715,6 +715,43 @@ def schedule_followup(case_id):
     return jsonify({'message': 'Follow-up scheduled', 'followup': followup}), 201
 
 
+@app.route('/api/lawyer/cases/<case_id>/messages', methods=['GET', 'POST'])
+@login_required
+@role_required('lawyer')
+def lawyer_case_messages(case_id):
+    """Get or send messages for case (lawyer endpoint)"""
+    lawyer_id = session['user_id']
+    
+    # Check access
+    if not case_manager.check_access(case_id, lawyer_id, 'lawyer'):
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    if request.method == 'GET':
+        messages = message_manager.get_messages(case_id)
+        return jsonify({'messages': messages})
+    
+    elif request.method == 'POST':
+        data = request.json
+        content = data.get('content')
+        
+        if not content:
+            return jsonify({'error': 'Message content required'}), 400
+        
+        message = message_manager.send_message(case_id, lawyer_id, 'lawyer', content)
+        
+        # Notify client
+        case = case_store.get_case(case_id)
+        if case:
+            notification_manager.add_notification(
+                case['client_id'],
+                'new_message',
+                f'New message from lawyer in case {case_id}',
+                case_id
+            )
+        
+        return jsonify({'message': 'Message sent', 'data': message}), 201
+
+
 # NEW: Available Cases Pool Endpoints
 @app.route('/api/lawyer/available-cases', methods=['GET'])
 @login_required
@@ -755,11 +792,17 @@ def claim_case(case_id):
     if not success:
         return jsonify({'error': message}), 400
     
-    # Update case store
+    # Update case store with lawyer assignment
     case_manager.assign_lawyer(case_id, lawyer_id)
     
-    # Notify client
+    # Update case status to 'in_review' when claimed
     case = case_store.get_case(case_id)
+    if case and case['status'] == 'created':
+        case['status'] = 'in_review'
+        case['updated_at'] = datetime.now().isoformat()
+        case_store.cases[case_id] = case
+    
+    # Notify client
     if case:
         notification_manager.add_notification(
             case['client_id'],
@@ -793,6 +836,12 @@ def unclaim_case(case_id):
     
     # Remove lawyer assignment
     case_manager.assign_lawyer(case_id, None)
+    
+    # Reset status back to 'created'
+    if case['status'] == 'in_review':
+        case['status'] = 'created'
+        case['updated_at'] = datetime.now().isoformat()
+        case_store.cases[case_id] = case
     
     # Notify client
     notification_manager.add_notification(

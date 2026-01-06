@@ -191,6 +191,13 @@ class API {
         });
     }
 
+    static async sendLawyerMessage(caseId, content) {
+        return await this.request(`/lawyer/cases/${caseId}/messages`, {
+            method: 'POST',
+            body: { content }
+        });
+    }
+
     // NEW: Law Firm Portal Endpoints
     static async getAllLawyers() {
         return await this.request('/lawyers');
@@ -288,12 +295,22 @@ function requireAuth(allowedRole = null) {
     const user = Session.getUser();
 
     if (!user) {
-        window.location.href = '../client/login.html';
+        // Not logged in - redirect to client login
+        if (window.location.pathname.includes('/lawyer/')) {
+            window.location.href = '../lawyer/login.html';
+        } else {
+            window.location.href = '../client/login.html';
+        }
         return false;
     }
 
     if (allowedRole && user.role !== allowedRole) {
-        window.location.href = '../client/login.html';
+        // Wrong role - redirect to correct portal
+        if (user.role === 'lawyer') {
+            window.location.href = '../lawyer/dashboard.html';
+        } else {
+            window.location.href = '../client/dashboard.html';
+        }
         return false;
     }
 

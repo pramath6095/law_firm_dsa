@@ -29,7 +29,9 @@
             </div>
 
             <div class="btn-group" id="case-actions" style="margin-top: 15px; display: none;">
-                <button class="btn btn-danger" onclick="unclaimCase()">Un-claim Case (Return to Pool)</button>
+                <button class="btn btn-danger" onclick="rejectCase()">Reject Case (→ General Pool)</button>
+                <button class="btn btn-warning" onclick="unclaimCase()">Un-claim Case (Return to Pool)</button>
+                <button class="btn btn-success" onclick="markComplete()">Mark as Completed</button>
             </div>
 
             <div class="tabs">
@@ -176,6 +178,37 @@
             }
         }
 
+        async function rejectCase() {
+            const reason = prompt('Enter rejection reason (case will go to general pool):');
+            if (!reason) return;
+
+            if (!confirm('Reject this case and send to general pool for all lawyers?')) return;
+
+            try {
+                await API.unclaimCase(caseId); // Same as unclaim but with reason
+                showAlert(`Case rejected: ${reason}. Sent to general pool.`, 'success');
+                setTimeout(() => {
+                    window.location.href = 'cases.html';
+                }, 1500);
+            } catch (error) {
+                showAlert('Error rejecting case: ' + error.message, 'error');
+            }
+        }
+
+        async function markComplete() {
+            if (!confirm('Mark this case as completed? Status will change to "closed".')) return;
+
+            try {
+                await API.updateCase(caseId, 'closed', 'Case marked as completed by lawyer');
+                showAlert('Case marked as completed!', 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } catch (error) {
+                showAlert('Error marking complete: ' + error.message, 'error');
+            }
+        }
+
         async function loadCaseDetails() {
             try {
                 const data = await API.getLawyerCaseDetails(caseId);
@@ -303,10 +336,11 @@
             const content = document.getElementById('message-content').value;
 
             try {
-                await API.sendMessage(caseId, content);
+                await API.sendLawyerMessage(caseId, content);
                 document.getElementById('message-content').value = '';
                 const data = await API.getLawyerCaseDetails(caseId);
                 loadMessages(data.messages);
+                showAlert('Message sent successfully!', 'success');
             } catch (error) {
                 showAlert('Error sending message: ' + error.message, 'error');
             }
