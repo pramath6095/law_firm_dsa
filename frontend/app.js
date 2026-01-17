@@ -51,6 +51,13 @@ class API {
             const data = await response.json();
 
             if (!response.ok) {
+                // For 503 (all busy), preserve the full error data
+                if (response.status === 503) {
+                    const error = new Error(data.error || 'Service Unavailable');
+                    error.statusCode = 503;
+                    error.data = data; // Preserve contact info
+                    throw error;
+                }
                 throw new Error(data.error || 'Request failed');
             }
 
@@ -98,6 +105,14 @@ class API {
             method: 'POST',
             body: caseData
         });
+    }
+
+    static async getLawyers() {
+        return await this.request('/lawyers');
+    }
+
+    static async getWeeklyCalendar(params = '') {
+        return await this.request(`/calendar/week${params}`);
     }
 
     static async getCaseDetails(caseId) {

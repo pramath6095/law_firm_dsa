@@ -40,12 +40,28 @@ class CaseManager:
         self.case_history_stack = {}  # case_id -> Stack of previous states
     
     def create_case(self, client_id: str, case_type: str, 
-                   description: str, urgency: bool) -> Dict:
+                   description: str, hearing_date: str) -> Dict:
         """
-        Create new case with ownership
+        Create new case with ownership and auto-calculated urgency
+        hearing_date: ISO format datetime string
         Returns: case data dict
         """
         case_id = f"CASE-{uuid.uuid4().hex[:8].upper()}"
+        
+        # Calculate urgency based on hearing date
+        hearing_datetime = datetime.fromisoformat(hearing_date)
+        days_until = (hearing_datetime - datetime.now()).days
+        
+        # Determine urgency level
+        if days_until <= 7:
+            urgency_level = 'urgent'
+        elif days_until <= 14:
+            urgency_level = 'high'
+        else:
+            urgency_level = 'normal'
+        
+        # Priority score (negative days for max heap sorting)
+        priority_score = -days_until
         
         case_data = {
             'case_id': case_id,
@@ -53,11 +69,24 @@ class CaseManager:
             'lawyer_id': None,  # Assigned later
             'case_type': case_type,
             'description': description,
-            'urgency': urgency,
+            'hearing_date': hearing_date,
+            'urgency_level': urgency_level,
+            'days_until_hearing': days_until,
+            'priority_score': priority_score,
             'status': 'created',
             'created_at': datetime.now().isoformat(),
             'updated_at': datetime.now().isoformat(),
-            'updates': []
+            'updates': [],
+            'events': [  # Initialize with hearing event
+                {
+                    'event_id': f'EVT-{uuid.uuid4().hex[:8].upper()}',
+                    'event_type': 'hearing',
+                    'date': hearing_date,
+                    'description': 'Court hearing',
+                    'created_by': 'system',
+                    'created_at': datetime.now().isoformat()
+                }
+            ]
         }
         
         self.case_store.add_case(case_id, case_data)
@@ -146,6 +175,59 @@ class CaseManager:
     def assign_lawyer(self, case_id: str, lawyer_id: str) -> bool:
         """Assign lawyer to case"""
         return self.case_store.update_case(case_id, {'lawyer_id': lawyer_id})
+    
+    def get_lawyer_case_count(self, lawyer_id: str) -> int:
+        """Count active cases for a lawyer"""
+        all_cases = self.case_store.get_all_cases()
+        return len([c for c in all_cases 
+                    if c.get('lawyer_id') == lawyer_id 
+                    and c.get('status') != 'closed'])
+    
+    def find_available_lawyer(self, speciality: str, user_store):
+        """Find lawyer with matching speciality and < 2 cases"""
+        all_lawyers = [u for u in user_store.users.values() 
+                       if u.get('role') == 'lawyer']
+        
+        for lawyer in all_lawyers:
+            if lawyer.get('speciality') == speciality:
+                case_count = self.get_lawyer_case_count(lawyer['user_id'])
+                if case_count < 2:
+                    return lawyer
+        
+        return None
+    
+    def create_case_with_assignment(self, client_id, case_type, description, 
+                                    hearing_date, selected_lawyer_id, speciality, user_store):
+        """
+        New flow with auto-assignment:
+        1. Create case  
+        2. Try to assign to selected_lawyer_id
+        3. If busy, find another lawyer with same speciality
+        4. If all busy, return error with firm contact
+        """
+        # Create case using existing create_case method
+        case = self.create_case(client_id, case_type, description, hearing_date)
+        
+        # Try selected lawyer first
+        lawyer = user_store.get_user_by_id(selected_lawyer_id)
+        case_count = self.get_lawyer_case_count(selected_lawyer_id)
+        
+        if case_count < 2:
+            # Assign to selected lawyer
+            case['lawyer_id'] = selected_lawyer_id
+            self.case_store.update_case(case['case_id'], {'lawyer_id': selected_lawyer_id})
+            return ('success', case, None)
+        
+        # Selected lawyer busy, find alternative with same speciality
+        alternative = self.find_available_lawyer(speciality, user_store)
+        
+        if alternative:
+            case['lawyer_id'] = alternative['user_id']
+            self.case_store.update_case(case['case_id'], {'lawyer_id': alternative['user_id']})
+            return ('auto_assigned', case, alternative)
+        
+        # All specialists busy
+        return ('all_busy', None, None)
 
 
 class AppointmentManager:
@@ -646,3 +728,58 @@ class NotificationManager:
         """Count unread notifications"""
         notifications = self.get_notifications(user_id)
         return sum(1 for n in notifications if not n['read'])
+
+
+
+class EventManager:
+    """Manages hearings, appointments, and follow-ups for cases"""
+    
+    def __init__(self, case_store):
+        self.case_store = case_store
+    
+    def add_event(self, case_id, event_type, date, description, created_by):
+        """Add event to case - event_type: hearing, appointment, followup"""
+        event = {
+            'event_id': f'EVT-{uuid.uuid4().hex[:8].upper()}',
+            'event_type': event_type,
+            'date': date,
+            'description': description,
+            'created_by': created_by,
+            'created_at': datetime.now().isoformat()
+        }
+        
+        case = self.case_store.get_case(case_id)
+        if 'events' not in case:
+            case['events'] = []
+        case['events'].append(event)
+        self.case_store.update_case(case_id, case)
+        return event
+    
+    def get_weekly_events(self, user_id, role, start_date=None):
+        """Get all events for the week, sorted by priority"""
+        if start_date is None:
+            start_date = datetime.now()
+       
+        week_start = start_date - timedelta(days=start_date.weekday())
+        week_end = week_start + timedelta(days=7)
+        
+        if role == 'client':
+            cases = self.case_store.get_cases_by_client(user_id)
+        else:
+            cases = self.case_store.get_cases_by_lawyer(user_id)
+        
+        all_events = []
+        for case in cases:
+            for event in case.get('events', []):
+                event_date = datetime.fromisoformat(event['date'])
+                if week_start <= event_date <= week_end:
+                    all_events.append({
+                        **event,
+                        'case_id': case['case_id'],
+                        'case_type': case['case_type'],
+                        'urgency_level': case.get('urgency_level'),
+                        'priority_score': case.get('priority_score', 0)
+                    })
+        
+        all_events.sort(key=lambda e: e.get('priority_score', 0), reverse=True)
+        return all_events
