@@ -62,11 +62,11 @@ def init_sample_data():
     
     # Sample Lawyers
     lawyers = [
-        {"id": "LAWYER-001", "name": "Sarah Mitchell", "email": "sarah.mitchell@lawfirm.com"},
-        {"id": "LAWYER-002", "name": "David Chen", "email": "david.chen@lawfirm.com"},
-        {"id": "LAWYER-003", "name": "Emily Rodriguez", "email": "emily.rodriguez@lawfirm.com"},
-        {"id": "LAWYER-004", "name": "Michael Johnson", "email": "michael.johnson@lawfirm.com"},
-        {"id": "LAWYER-005", "name": "Priya Sharma", "email": "priya.sharma@lawfirm.com"},
+        {"id": "LAWYER-001", "name": "Sarah Mitchell", "email": "a@lawfirm.com"},
+        {"id": "LAWYER-002", "name": "David Chen", "email": "b@lawfirm.com"},
+        {"id": "LAWYER-003", "name": "Emily Rodriguez", "email": "c@lawfirm.com"},
+        {"id": "LAWYER-004", "name": "Michael Johnson", "email": "d@lawfirm.com"},
+        {"id": "LAWYER-005", "name": "Priya Sharma", "email": "e@lawfirm.com"},
     ]
     
     for lawyer in lawyers:
@@ -81,11 +81,11 @@ def init_sample_data():
     
     # Sample Clients
     clients = [
-        {"id": "CLIENT-001", "name": "John Doe", "email": "john.doe@example.com"},
-        {"id": "CLIENT-002", "name": "Jane Smith", "email": "jane.smith@example.com"},
-        {"id": "CLIENT-003", "name": "Robert Brown", "email": "robert.brown@example.com"},
-        {"id": "CLIENT-004", "name": "Lisa Anderson", "email": "lisa.anderson@example.com"},
-        {"id": "CLIENT-005", "name": "Mark Wilson", "email": "mark.wilson@example.com"},
+        {"id": "CLIENT-001", "name": "John Doe", "email": "a@gmail.com"},
+        {"id": "CLIENT-002", "name": "Jane Smith", "email": "b@gmail.com"},
+        {"id": "CLIENT-003", "name": "Robert Brown", "email": "c@gmail.com"},
+        {"id": "CLIENT-004", "name": "Lisa Anderson", "email": "d@gmail.com"},
+        {"id": "CLIENT-005", "name": "Mark Wilson", "email": "e@gmail.com"},
     ]
     
     for client in clients:
