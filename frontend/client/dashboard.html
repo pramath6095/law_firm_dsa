@@ -117,8 +117,8 @@
         }
 
         .stat-card {
-            background: white;
-            border: 1px solid #ddd;
+            background: var(--bg-white);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 20px;
             text-align: center;
@@ -132,7 +132,7 @@
 
         .stat-label {
             font-size: 14px;
-            color: #666;
+            color: var(--text-gray);
             margin-top: 5px;
         }
     </style>
@@ -146,6 +146,8 @@
                 <a href="dashboard.html">Dashboard</a>
                 <a href="my-cases.html">My Cases</a>
                 <a href="profile.html">Profile</a>
+                <a href="create-case.html" class="btn btn-primary" style="margin-left: 15px; padding: 8px 16px;">➕
+                    Create New Case</a>
                 <button class="btn btn-secondary" onclick="handleLogout()">Logout</button>
             </nav>
         </div>
@@ -154,20 +156,38 @@
     <div class="container">
         <div id="user-welcome"></div>
 
-        <!-- Stats Section -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-value" id="total-cases-stat">0</div>
-                <div class="stat-label">Total Cases</div>
+        <!-- My Active Cases -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="color: var(--primary-color); margin: 0;">📋 My Active Cases</h2>
+                <a href="my-cases.html" class="btn btn-secondary" style="padding: 8px 16px; font-size: 14px;">View
+                    All</a>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" id="this-week-events-stat">0</div>
-                <div class="stat-label">Events This Week</div>
+            <div id="active-cases-cards">
+                <p class="loading">Loading your cases...</p>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" id="urgent-events-stat">0</div>
-                <div class="stat-label">Urgent Events</div>
+        </div>
+
+        <!-- Next Upcoming Event Banner -->
+        <div id="next-event-banner" class="card"
+            style="display: none; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: white;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-size: 13px; opacity: 0.9; font-weight: 600;">📅 NEXT UPCOMING EVENT</div>
+                    <div id="next-event-title" style="font-size: 20px; font-weight: 600; margin-top: 8px;"></div>
+                    <div id="next-event-date" style="font-size: 15px; margin-top: 5px; opacity: 0.95;"></div>
+                </div>
+                <div id="next-event-badge"
+                    style="background: rgba(255,255,255,0.25); padding: 10px 20px; border-radius: 25px; font-weight: 700; font-size: 14px;">
+                </div>
             </div>
+        </div>
+
+
+        <!-- Recent Updates -->
+        <div class="card" id="recent-updates-card" style="display: none;">
+            <h3 style="margin-bottom: 15px; color: var(--primary-color);">🔔 Recent Updates</h3>
+            <div id="recent-updates-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
         </div>
 
         <!-- Weekly Calendar -->
@@ -184,10 +204,6 @@
             <div id="events-container">
                 <p class="loading">Loading events...</p>
             </div>
-        </div>
-
-        <div class="text-center mt-2">
-            <a href="create-case.html" class="btn btn-primary">Create New Case</a>
         </div>
     </div>
 
@@ -236,6 +252,26 @@
 
         function displayEvents(events) {
             const container = document.getElementById('events-container');
+
+            // Show next upcoming event banner
+            if (events.length > 0) {
+                const now = new Date();
+                const upcomingEvents = events.filter(e => new Date(e.date) >= now);
+                if (upcomingEvents.length > 0) {
+                    const nextEvent = upcomingEvents[0];
+                    const eventDate = new Date(nextEvent.date);
+                    const urgencyBadge = nextEvent.urgency_level === 'urgent' ? 'URGENT' :
+                        nextEvent.urgency_level === 'high' ? 'HIGH PRIORITY' : 'NORMAL';
+
+                    document.getElementById('next-event-title').textContent = nextEvent.description;
+                    document.getElementById('next-event-date').textContent = eventDate.toLocaleDateString('en-US', {
+                        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                    });
+                    document.getElementById('next-event-badge').textContent = urgencyBadge;
+                    document.getElementById('next-event-banner').style.display = 'block';
+                }
+            }
 
             if (events.length === 0) {
                 container.innerHTML = `
@@ -289,16 +325,68 @@
             }).join('');
         }
 
+        async function loadActiveCases() {
+            try {
+                const casesData = await API.getClientCases();
+                const cases = (casesData.cases || []).filter(c => c.status !== 'closed');
+
+                // Sort by created_at descending (latest first)
+                cases.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+                //Show up to 3 most recent active cases
+                const displayCases = cases.slice(0, 3);
+
+                const container = document.getElementById('active-cases-cards');
+
+                if (displayCases.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <p>You don't have any active cases yet</p>
+                            <a href="create-case.html" class="btn btn-primary" style="margin-top: 15px;">Create Your First Case</a>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = displayCases.map(c => {
+                    const urgencyBadge = c.urgency_level === 'urgent' ? '🔴 URGENT' :
+                        c.urgency_level === 'high' ? '🟡 HIGH' : '🟢 NORMAL';
+                    const daysText = c.days_until_hearing !== undefined ?
+                        `📅 Hearing in ${c.days_until_hearing} days` : '';
+
+                    return `
+                        <div class="case-item" onclick="window.location.href='case-details.html?id=${c.case_id}'" 
+                             style="border: 2px solid var(--border-color); border-radius: 8px; padding: 20px; margin-bottom: 15px; cursor: pointer; transition: all 0.2s; background: var(--bg-white);">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+                                <div>
+                                    <h3 style="margin: 0 0 8px 0; color: var(--primary-color); font-size: 18px;">${c.case_id}</h3>
+                                    <div style="color: var(--text-gray); font-size: 14px; margin-bottom: 5px;">${c.case_type}</div>
+                                    ${c.lawyer_id ? `<div style="color: var(--text-dark); font-size: 14px;">👨‍⚖️ Lawyer: ${c.lawyer_id}</div>` : ''}
+                                </div>
+                                <div style="text-align: right;">
+                                    <span class="case-status status-${c.status}" style="display: inline-block; margin-bottom: 8px;">${formatStatus(c.status)}</span>
+                                    <div style="font-size: 13px; font-weight: 600;">${urgencyBadge}</div>
+                                </div>
+                            </div>
+                            ${daysText ? `<div style="padding: 10px; background: rgba(239, 68, 68, 0.1); border-left: 3px solid var(--urgent-color); border-radius: 4px; margin-bottom: 10px; color: var(--text-dark);">${daysText}</div>` : ''}
+                            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                                <button class="btn btn-primary" style="flex: 1; padding: 10px;" onclick="event.stopPropagation(); window.location.href='case-details.html?id=${c.case_id}'">
+                                    View Details
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error('Error loading active cases:', error);
+                document.getElementById('active-cases-cards').innerHTML =
+                    '<div class="alert alert-error">Error loading cases</div>';
+            }
+        }
+
         function updateStats(events) {
-            document.getElementById('this-week-events-stat').textContent = events.length;
-
-            const urgentCount = events.filter(e => e.urgency_level === 'urgent').length;
-            document.getElementById('urgent-events-stat').textContent = urgentCount;
-
-            // Load total cases count
-            API.getClientCases().then(data => {
-                document.getElementById('total-cases-stat').textContent = data.cases?.length || 0;
-            });
+            // Stats removed - now showing detailed case cards instead
         }
 
         function changeWeek(direction) {

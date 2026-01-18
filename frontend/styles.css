@@ -10,25 +10,39 @@ Clean, functional styling with case-centric layout
 }
 
 :root {
-    --primary-color: #2563eb;
-    --secondary-color: #1e40af;
-    --success-color: #10b981;
-    --warning-color: #f59e0b;
-    --danger-color: #ef4444;
-    --urgent-color: #dc2626;
-    --bg-light: #f9fafb;
-    --bg-white: #ffffff;
-    --text-dark: #111827;
-    --text-gray: #6b7280;
-    --border-color: #e5e7eb;
-    --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+    --primary-color: #60a5fa;
+    /* Lighter blue for better visibility */
+    --secondary-color: #3b82f6;
+    --success-color: #34d399;
+    /* Brighter green */
+    --warning-color: #fbbf24;
+    /* Brighter yellow/orange */
+    --danger-color: #f87171;
+    /* Brighter red */
+    --urgent-color: #ef4444;
+    /* Bright urgent red */
+    --bg-light: #0f172a;
+    /* Deep dark blue-gray for main background */
+    --bg-white: #1e293b;
+    /* Lighter slate for cards - better contrast */
+    --text-dark: #f1f5f9;
+    /* Very light gray - high contrast for main text */
+    --text-gray: #cbd5e1;
+    /* Light gray for secondary text - still readable */
+    --border-color: #334155;
+    /* Medium slate for borders - visible but not harsh */
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    /* Slightly stronger shadow */
+    --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.6);
+    /* Deeper shadow for elevation */
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background-color: var(--bg-light);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg-light);
+    /* Updated to use dark theme variable */
     color: var(--text-dark);
+    /* Updated to use dark theme variable */
     line-height: 1.6;
 }
 
@@ -91,7 +105,8 @@ body {
     align-items: center;
 }
 
-.nav-links a, .nav-links button {
+.nav-links a,
+.nav-links button {
     text-decoration: none;
     color: var(--text-gray);
     font-weight: 500;
@@ -163,30 +178,24 @@ body {
 
 .btn-primary {
     background-color: var(--primary-color);
-    color: white;
+    color: #0f172a;
+    /* Dark text on bright button for maximum contrast */
+    font-weight: 600;
 }
 
 .btn-primary:hover {
-    background-color: var(--secondary-color);
+    background-color: #3b82f6;
+    transform: translateY(-1px);
 }
 
 .btn-secondary {
-    background-color: var(--text-gray);
-    color: white;
+    background-color: #475569;
+    /* Lighter gray for visibility */
+    color: var(--text-dark);
 }
 
 .btn-secondary:hover {
-    background-color: var(--text-dark);
-}
-
-.btn-success {
-    background-color: var(--success-color);
-    color: white;
-}
-
-.btn-danger {
-    background-color: var(--danger-color);
-    color: white;
+    background-color: #64748b;
 }
 
 .btn-full {
@@ -420,6 +429,7 @@ body {
 
 .text-muted {
     color: var(--text-gray);
+    /* Bright readable gray instead of dim */
 }
 
 .mt-2 {
@@ -443,10 +453,13 @@ body {
 .empty-state {
     text-align: center;
     padding: 40px;
-    color: var(--text-gray);
+    color: var(--text-dark);
+    /* Bright text for empty states */
 }
 
 .loading {
     text-align: center;
     padding: 40px;
+    color: var(--text-dark);
+    /* Bright text for loading states */
 }

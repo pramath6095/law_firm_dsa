@@ -240,7 +240,10 @@ class CaseManager:
         return ('all_busy', None, None)
 
 
-class AppointmentManager:
+
+# AppointmentManager removed - system no longer uses appointments
+
+
     """Handles appointment requests with queue-based processing"""
     
     def __init__(self):

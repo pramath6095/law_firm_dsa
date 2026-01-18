@@ -120,9 +120,25 @@
                 <p id="urgent-cases" style="font-size: 2rem; font-weight: bold; color: var(--urgent-color);">-</p>
             </div>
 
-            <div class="card">
-                <h2>Pending Requests</h2>
-                <p id="pending-requests" style="font-size: 2rem; font-weight: bold; color: var(--warning-color);">-</p>
+        </div>
+
+        <!-- Case Status Summary -->
+        <div class="card">
+            <h2 style="color: var(--primary-color); margin-bottom: 20px;">📊 Case Status Breakdown</h2>
+            <div style="display: flex; gap: 30px; justify-content: space-around;">
+                <div style="text-align: center;">
+                    <div style="font-size: 32px; font-weight: bold; color: #10b981;" id="status-active">0</div>
+                    <div style="font-size: 15px; color: var(--text-gray); margin-top: 5px;">Active</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 32px; font-weight: bold; color: #f59e0b;" id="status-review">0</div>
+                    <div style="font-size: 15px; color: var(--text-gray); margin-top: 5px;">In Review</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 32px; font-weight: bold; color: var(--primary-color);" id="status-created">0
+                    </div>
+                    <div style="font-size: 15px; color: var(--text-gray); margin-top: 5px;">Created</div>
+                </div>
             </div>
         </div>
 
@@ -168,9 +184,24 @@
             try {
                 const data = await API.getLawyerDashboard();
 
+
                 document.getElementById('total-cases').textContent = data.total_cases || 0;
                 document.getElementById('urgent-cases').textContent = data.urgent_cases_count || 0;
-                document.getElementById('pending-requests').textContent = data.pending_requests_count || 0;
+
+                // Populate case status summary
+                const allCases = data.urgent_cases || [];
+                // Fetch all cases to get complete status breakdown
+                const casesData = await API.getLawyerCases();
+                const cases = casesData.cases || [];
+
+                const statusActive = cases.filter(c => c.status === 'active').length;
+                const statusReview = cases.filter(c => c.status === 'in_review').length;
+                const statusCreated = cases.filter(c => c.status === 'created').length;
+
+                document.getElementById('status-active').textContent = statusActive;
+                document.getElementById('status-review').textContent = statusReview;
+                document.getElementById('status-created').textContent = statusCreated;
+
 
                 // Display urgent cases with days remaining
                 const urgentDiv = document.getElementById('urgent-cases-list');
