@@ -789,7 +789,11 @@ class EventManager:
                 continue
             
             for event in case.get('events', []):
+                # Parse event date and strip timezone for comparison
                 event_date = datetime.fromisoformat(event['date'])
+                if event_date.tzinfo is not None:
+                    event_date = event_date.replace(tzinfo=None)
+                
                 if week_start <= event_date <= week_end:
                     all_events.append({
                         **event,
@@ -800,5 +804,5 @@ class EventManager:
                     })
         
         # Sort by date/time ascending (chronological order for calendar)
-        all_events.sort(key=lambda e: datetime.fromisoformat(e['date']))
+        all_events.sort(key=lambda e: datetime.fromisoformat(e['date']).replace(tzinfo=None) if datetime.fromisoformat(e['date']).tzinfo else datetime.fromisoformat(e['date']))
         return all_events

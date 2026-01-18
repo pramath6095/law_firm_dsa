@@ -803,9 +803,7 @@ def schedule_followup(case_id):
             event_type='followup',
             date=scheduled_date,
             description=f"{followup_type.capitalize()}: {notes if notes else 'Follow-up appointment'}",
-            case_type=case['case_type'],
-            urgency_level=case.get('urgency_level', 'normal'),
-            priority_score=case.get('priority_score', 999)
+            created_by=lawyer_id
         )
         
         # Notify client
