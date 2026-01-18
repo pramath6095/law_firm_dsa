@@ -24,8 +24,21 @@
     <div class="container">
         <h2>My Cases</h2>
 
-        <div id="cases-list">
-            <p class="loading">Loading cases...</p>
+        <div class="tabs">
+            <button class="tab active" data-tab="active">Active Cases</button>
+            <button class="tab" data-tab="closed">Closed Cases</button>
+        </div>
+
+        <div id="active" class="tab-content active">
+            <div id="active-cases-list">
+                <p class="loading">Loading active cases...</p>
+            </div>
+        </div>
+
+        <div id="closed" class="tab-content">
+            <div id="closed-cases-list">
+                <p class="loading">Loading closed cases...</p>
+            </div>
         </div>
     </div>
 
@@ -35,30 +48,23 @@
             // Redirected
         }
 
+        let allCases = [];
+
         async function loadCases() {
             try {
                 const data = await API.getLawyerCases();
+                allCases = data.cases || [];
 
-                const casesDiv = document.getElementById('cases-list');
+                // Separate active and closed cases
+                const activeCases = allCases.filter(c => c.status !== 'closed');
+                const closedCases = allCases.filter(c => c.status === 'closed');
 
-                if (data.cases && data.cases.length > 0) {
-                    casesDiv.innerHTML = data.cases.map(c => {
-                        const urgencyClass = c.urgency_level === 'urgent' ? 'urgent' :
-                            c.urgency_level === 'high' ? 'high' : 'normal';
-                        const daysText = c.days_until_hearing !== undefined ?
-                            `Hearing in ${c.days_until_hearing} days` : '';
+                // Sort by created_at descending (latest first - LIFO/Stack order)
+                activeCases.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                closedCases.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-                        return `
-                        <div class="case-item ${urgencyClass}" onclick="window.location.href='case-details.html?id=${c.case_id}'">
-                            <div class="case-id">${c.case_id}</div>
-                            <div class="case-type">${c.case_type}</div>
-                            <div class="case-days">${daysText}</div>
-                            <span class="case-status status-${c.status}">${formatStatus(c.status)}</span>
-                        </div>
-                    `}).join('');
-                } else {
-                    casesDiv.innerHTML = '<p class="text-muted">No cases assigned</p>';
-                }
+                displayCases('active-cases-list', activeCases);
+                displayCases('closed-cases-list', closedCases);
 
             } catch (error) {
                 console.error('Error loading cases:', error);
@@ -66,6 +72,31 @@
             }
         }
 
+        function displayCases(containerId, cases) {
+            const casesDiv = document.getElementById(containerId);
+
+            if (cases && cases.length > 0) {
+                casesDiv.innerHTML = cases.map(c => {
+                    const urgencyClass = c.urgency_level === 'urgent' ? 'urgent' :
+                        c.urgency_level === 'high' ? 'high' : 'normal';
+                    const daysText = c.days_until_hearing !== undefined ?
+                        `Hearing in ${c.days_until_hearing} days` : '';
+
+                    return `
+                    <div class="case-item ${urgencyClass}" onclick="window.location.href='case-details.html?id=${c.case_id}'">
+                        <div class="case-id">${c.case_id}</div>
+                        <div class="case-type">${c.case_type}</div>
+                        <div class="case-days">${daysText}</div>
+                        <span class="case-status status-${c.status}">${formatStatus(c.status)}</span>
+                    </div>
+                `}).join('');
+            } else {
+                casesDiv.innerHTML = `<p class="text-muted">No ${containerId.includes('active') ? 'active' : 'closed'} cases</p>`;
+            }
+        }
+
+        // Tab functionality
+        initTabs();
         loadCases();
     </script>
 </body>

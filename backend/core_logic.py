@@ -784,6 +784,10 @@ class EventManager:
         
         all_events = []
         for case in cases:
+            # Exclude events from closed cases
+            if case.get('status') == 'closed':
+                continue
+            
             for event in case.get('events', []):
                 event_date = datetime.fromisoformat(event['date'])
                 if week_start <= event_date <= week_end:
