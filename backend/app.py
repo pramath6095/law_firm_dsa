@@ -60,13 +60,43 @@ FIRM_CONTACT_INFO = {
 def init_sample_data():
     """Initialize with 5 sample lawyers and 5 sample clients"""
     
-    # Sample Lawyers
+    # Sample Lawyers with specialities and costs
     lawyers = [
-        {"id": "LAWYER-001", "name": "Sarah Mitchell", "email": "a@lawfirm.com"},
-        {"id": "LAWYER-002", "name": "David Chen", "email": "b@lawfirm.com"},
-        {"id": "LAWYER-003", "name": "Emily Rodriguez", "email": "c@lawfirm.com"},
-        {"id": "LAWYER-004", "name": "Michael Johnson", "email": "d@lawfirm.com"},
-        {"id": "LAWYER-005", "name": "Priya Sharma", "email": "e@lawfirm.com"},
+        {
+            "id": "LAWYER-001", 
+            "name": "Sarah Mitchell", 
+            "email": "a@lawfirm.com",
+            "speciality": ["Civil Law", "Criminal Law"],
+            "cost_per_hearing": 5000.00
+        },
+        {
+            "id": "LAWYER-002", 
+            "name": "David Chen", 
+            "email": "b@lawfirm.com",
+            "speciality": ["Civil Law", "Criminal Law"],
+            "cost_per_hearing": 5500.00
+        },
+        {
+            "id": "LAWYER-003", 
+            "name": "Emily Rodriguez", 
+            "email": "c@lawfirm.com",
+            "speciality": ["Family Law"],
+            "cost_per_hearing": 3500.00
+        },
+        {
+            "id": "LAWYER-004", 
+            "name": "Michael Johnson", 
+            "email": "d@lawfirm.com",
+            "speciality": ["Corporate Law"],
+            "cost_per_hearing": 4500.00
+        },
+        {
+            "id": "LAWYER-005", 
+            "name": "Priya Sharma", 
+            "email": "e@lawfirm.com",
+            "speciality": ["Property Law"],
+            "cost_per_hearing": 6000.00
+        },
     ]
     
     for lawyer in lawyers:
@@ -76,7 +106,9 @@ def init_sample_data():
             'password': 'password123',
             'name': lawyer["name"],
             'phone': f'555-{lawyer["id"][-3:]}',
-            'role': 'lawyer'
+            'role': 'lawyer',
+            'speciality': lawyer["speciality"],  # List of specialities
+            'cost_per_hearing': lawyer["cost_per_hearing"]
         })
     
     # Sample Clients
@@ -307,6 +339,18 @@ def client_cases():
         if not all([case_type, description, hearing_date, selected_lawyer_id, speciality]):
             return jsonify({'error': 'All fields required: case_type, description, hearing_date, lawyer_id, speciality'}), 400
         
+        # Validate description minimum 50 words (using string data type operations)
+        # Split description into words and count non-empty strings
+        words = [word for word in description.split() if word.strip()]
+        word_count = len(words)
+        
+        if word_count < 50:
+            return jsonify({
+                'error': f'Description must be at least 50 words. Current: {word_count} words.',
+                'word_count': word_count,
+                'required': 50
+            }), 400
+        
         # Attempt assignment with auto-fallback
         result_type, case, extra = case_manager.create_case_with_assignment(
             client_id, case_type, description, hearing_date,
@@ -515,7 +559,9 @@ def lawyer_dashboard():
     
     # Get assigned cases
     cases = case_store.get_cases_by_lawyer(lawyer_id)
-    urgent_cases = [c for c in cases if c.get('urgency')]
+    
+    # Count urgent cases using urgency_level (not old boolean urgency)
+    urgent_cases = [c for c in cases if c.get('urgency_level') == 'urgent']
     
     # Get pending appointment requests
     pending_requests = appointment_manager.get_pending_requests()

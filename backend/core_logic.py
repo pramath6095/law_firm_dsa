@@ -177,22 +177,31 @@ class CaseManager:
         return self.case_store.update_case(case_id, {'lawyer_id': lawyer_id})
     
     def get_lawyer_case_count(self, lawyer_id: str) -> int:
-        """Count active cases for a lawyer"""
-        all_cases = self.case_store.get_all_cases()
-        return len([c for c in all_cases 
+        """Count active (non-closed) cases for a lawyer"""
+        all_cases = list(self.case_store.cases.values())
+        return sum(1 for c in all_cases 
                     if c.get('lawyer_id') == lawyer_id 
-                    and c.get('status') != 'closed'])
+                    and c.get('status') != 'closed')
     
-    def find_available_lawyer(self, speciality: str, user_store):
-        """Find lawyer with matching speciality and < 2 cases"""
-        all_lawyers = [u for u in user_store.users.values() 
-                       if u.get('role') == 'lawyer']
+    def find_available_lawyer(self, speciality: str, user_store) -> Optional[str]:
+        """
+        Find lawyer with matching speciality and capacity
+        Lawyers can have multiple specialities (list)
+        """
+        all_lawyers = [u for u in user_store.users.values() if u.get('role') == 'lawyer']
         
         for lawyer in all_lawyers:
-            if lawyer.get('speciality') == speciality:
-                case_count = self.get_lawyer_case_count(lawyer['user_id'])
-                if case_count < 2:
-                    return lawyer
+            lawyer_specialities = lawyer.get('speciality', [])
+            
+            # Handle both string and list specialities for backward compatibility
+            if isinstance(lawyer_specialities, str):
+                lawyer_specialities = [lawyer_specialities]
+            
+            # Check if lawyer has the required speciality
+            if speciality in lawyer_specialities:
+                # Check if lawyer has capacity
+                if self.get_lawyer_case_count(lawyer['user_id']) < 2:
+                    return lawyer['user_id']
         
         return None
     

@@ -161,8 +161,9 @@
                 <div id="details-step" class="form-step" style="display: none;">
                     <div class="form-group">
                         <label for="description">Case Description *</label>
-                        <textarea id="description" required placeholder="Describe your legal issue in detail..."
-                            rows="5"></textarea>
+                        <textarea id="description" required
+                            placeholder="Describe your legal issue in detail (minimum 50 words)..." rows="5"></textarea>
+                        <small id="word-count" style="color: #666;">0 / 50 words minimum</small>
                     </div>
 
                     <div class="form-group">
@@ -239,7 +240,12 @@
             };
 
             const targetSpeciality = domainMap[domain] || domain;
-            const filteredLawyers = allLawyers.filter(l => l.speciality === targetSpeciality);
+
+            // Filter lawyers who have this speciality in their list
+            const filteredLawyers = allLawyers.filter(l => {
+                const specialities = Array.isArray(l.speciality) ? l.speciality : [l.speciality];
+                return specialities.includes(targetSpeciality);
+            });
 
             const lawyersList = document.getElementById('lawyers-list');
 
@@ -253,12 +259,18 @@
                 return;
             }
 
-            lawyersList.innerHTML = filteredLawyers.map(lawyer => `
+            lawyersList.innerHTML = filteredLawyers.map(lawyer => {
+                // Format specialities for display
+                const specialityDisplay = Array.isArray(lawyer.speciality)
+                    ? lawyer.speciality.join(', ')
+                    : lawyer.speciality;
+
+                return `
                 <div class="lawyer-card" data-lawyer-id="${lawyer.user_id}" onclick="selectLawyer('${lawyer.user_id}')">
                     <div class="lawyer-info">
                         <div class="lawyer-details">
                             <h4 style="margin: 0 0 5px 0;">${lawyer.name}</h4>
-                            <p style="margin: 0; font-size: 14px; color: #666;">${lawyer.speciality}</p>
+                            <p style="margin: 0; font-size: 14px; color: #666;">${specialityDisplay}</p>
                             <p class="case-count">Active cases: ${lawyer.active_cases || 0} / 2</p>
                         </div>
                         <div class="lawyer-cost">
@@ -267,7 +279,7 @@
                         </div>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
 
         // Select lawyer
@@ -294,7 +306,7 @@
         function goToStep(step) {
             currentStep = step;
 
-            //// Hide all steps
+            // Hide all steps
             document.querySelectorAll('.form-step').forEach(s => s.style.display = 'none');
 
             // Update step indicators
@@ -310,6 +322,23 @@
             else if (step === 2) document.getElementById('lawyer-step').style.display = 'block';
             else if (step === 3) document.getElementById('details-step').style.display = 'block';
         }
+
+        // Word count tracker for description (using string data type operations)
+        document.getElementById('description').addEventListener('input', (e) => {
+            const text = e.target.value;
+            const words = text.trim().split(/\s+/).filter(word => word.length > 0);
+            const wordCount = words.length;
+            const counter = document.getElementById('word-count');
+
+            counter.textContent = `${wordCount} / 50 words minimum`;
+
+            // Color code based on word count
+            if (wordCount < 50) {
+                counter.style.color = '#d00';  // Red
+            } else {
+                counter.style.color = '#080';  // Green
+            }
+        });
 
         // Form submission
         document.getElementById('create-case-form').addEventListener('submit', async (e) => {
