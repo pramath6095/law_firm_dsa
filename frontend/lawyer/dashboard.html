@@ -6,6 +6,90 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lawyer Dashboard - Legal Case Management</title>
     <link rel="stylesheet" href="../styles.css">
+    <style>
+        .event-item {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .event-item:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .event-item.urgent {
+            border-left: 5px solid #d00;
+            background: #fee;
+        }
+
+        .event-item.high-priority {
+            border-left: 5px solid #f80;
+            background: #ffc;
+        }
+
+        .event-item.normal {
+            border-left: 5px solid #080;
+            background: #efe;
+        }
+
+        .event-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 10px;
+        }
+
+        .event-type-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .event-type-hearing {
+            background: #007bff;
+            color: white;
+        }
+
+        .event-type-appointment {
+            background: #28a745;
+            color: white;
+        }
+
+        .event-type-followup {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .event-date {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .event-time {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .urgency-badge-display {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .empty-calendar {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+    </style>
 </head>
 
 <body>
@@ -14,8 +98,6 @@
             <h1>Legal Case Management - Lawyer Portal</h1>
             <nav class="nav-links">
                 <a href="dashboard.html">Dashboard</a>
-                <a href="available-cases.html">Available Cases</a>
-                <a href="pending-requests.html">My Requests</a>
                 <a href="cases.html">My Cases</a>
                 <a href="profile.html">Profile</a>
                 <button class="btn btn-secondary" onclick="handleLogout()">Logout</button>
@@ -53,10 +135,18 @@
         </div>
 
         <div class="card">
-            <h2>Quick Actions</h2>
-            <div class="btn-group">
-                <a href="consultation-requests.html" class="btn btn-primary">Review Appointment Requests</a>
-                <a href="cases.html" class="btn btn-secondary">Manage Cases</a>
+            <h2>This Week's Schedule</h2>
+            <p class="text-muted" style="margin-bottom: 20px;">Events sorted by priority (most urgent first)</p>
+
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                <button class="btn btn-secondary" onclick="previousWeek()">← Previous Week</button>
+                <div style="font-size: 18px; font-weight: 600;" id="week-range"></div>
+                <button class="btn btn-secondary" onclick="nextWeek()">Next Week →</button>
+            </div>
+
+            <div id="weekly-events">
+                <p class="loading">Loading...</p>
             </div>
         </div>
     </div>
@@ -82,16 +172,25 @@
                 document.getElementById('urgent-cases').textContent = data.urgent_cases_count || 0;
                 document.getElementById('pending-requests').textContent = data.pending_requests_count || 0;
 
-                // Display urgent cases
+                // Display urgent cases with days remaining
                 const urgentDiv = document.getElementById('urgent-cases-list');
                 if (data.urgent_cases && data.urgent_cases.length > 0) {
-                    urgentDiv.innerHTML = data.urgent_cases.map(c => `
-                        <div class="case-item urgent" onclick="window.location.href='case-details.html?id=${c.case_id}'">
-                            <div class="case-id">${c.case_id} <span class="urgent-badge">Urgent</span></div>
+                    urgentDiv.innerHTML = data.urgent_cases.map(c => {
+                        const daysText = c.days_until_hearing !== undefined ?
+                            `Hearing in ${c.days_until_hearing} day${c.days_until_hearing !== 1 ? 's' : ''}` : '';
+                        const urgencyClass = c.urgency_level === 'urgent' ? 'urgent' :
+                            c.urgency_level === 'high' ? 'high' : 'normal';
+                        const urgencyLabel = c.urgency_level === 'urgent' ? 'URGENT' :
+                            c.urgency_level === 'high' ? 'HIGH' : 'NORMAL';
+                        return `
+                        <div class="case-item ${urgencyClass}" onclick="window.location.href='case-details.html?id=${c.case_id}'">
+                            <div class="case-id">${c.case_id} <span class="urgency-badge ${urgencyClass}">${urgencyLabel}</span></div>
                             <div class="case-type">${c.case_type}</div>
+                            <div class="case-days">${daysText}</div>
                             <span class="case-status status-${c.status}">${formatStatus(c.status)}</span>
                         </div>
-                    `).join('');
+                    `;
+                    }).join('');
                 } else {
                     urgentDiv.innerHTML = '<p class="text-muted">No urgent cases</p>';
                 }
@@ -103,6 +202,90 @@
         }
 
         loadDashboard();
+
+        // Calendar functionality
+        let currentWeekStart = new Date();
+        currentWeekStart.setDate(currentWeekStart.getDate() - currentWeekStart.getDay());
+
+        async function loadWeeklyCalendar() {
+            try {
+                const startDate = currentWeekStart.toISOString().split('T')[0];
+                const data = await API.getWeeklyCalendar(`?start_date=${startDate}`);
+
+                // Calculate week range
+                const weekEnd = new Date(currentWeekStart);
+                weekEnd.setDate(weekEnd.getDate() + 6);
+                const dateOptions = { month: 'short', day: 'numeric', year: 'numeric' };
+                document.getElementById('week-range').textContent =
+                    `${currentWeekStart.toLocaleDateString('en-US', dateOptions)} - ${weekEnd.toLocaleDateString('en-US', dateOptions)}`;
+
+                const eventsDiv = document.getElementById('weekly-events');
+                if (data.events && data.events.length > 0) {
+                    eventsDiv.innerHTML = data.events.map(event => {
+                        const eventDate = new Date(event.date);
+                        const urgencyClass = event.urgency_level === 'urgent' ? 'urgent' :
+                            event.urgency_level === 'high' ? 'high-priority' : 'normal';
+
+                        const urgencyBadge = event.urgency_level === 'urgent' ? '🔴 URGENT' :
+                            event.urgency_level === 'high' ? '🟡 HIGH' : '🟢 NORMAL';
+
+                        const typeClass = `event-type-${event.event_type}`;
+                        const typeLabel = event.event_type.charAt(0).toUpperCase() + event.event_type.slice(1);
+
+                        return `
+                            <div class="event-item ${urgencyClass}" onclick="window.location.href='case-details.html?id=${event.case_id}'">
+                                <div class="event-header">
+                                    <div>
+                                        <div class="event-date">
+                                            ${eventDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                                        </div>
+                                        <div class="event-time">
+                                            ${eventDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <span class="event-type-badge ${typeClass}">${typeLabel}</span>
+                                        <div style="margin-top: 5px;">
+                                            <span class="urgency-badge-display">${urgencyBadge}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="margin-top: 10px;">
+                                    <strong>${event.description || 'No description'}</strong>
+                                </div>
+                                <div style="margin-top: 5px; font-size: 13px; color: #666;">
+                                    Case: ${event.case_id} (${event.case_type})
+                                </div>
+                                ${event.urgency_level === 'urgent' ?
+                                '<div style="margin-top: 8px; font-size: 12px; color: #d00; font-weight: 600;">⏰ Within 7 days - High Priority!</div>' : ''}
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    eventsDiv.innerHTML = `
+                        <div class="empty-calendar">
+                            <p style="font-size: 18px;">📅 No events scheduled this week</p>
+                            <p>Your calendar is clear!</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading calendar:', error);
+                document.getElementById('weekly-events').innerHTML = '<p class="text-muted">Error loading events</p>';
+            }
+        }
+
+        function previousWeek() {
+            currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+            loadWeeklyCalendar();
+        }
+
+        function nextWeek() {
+            currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+            loadWeeklyCalendar();
+        }
+
+        loadWeeklyCalendar();
     </script>
 </body>
 

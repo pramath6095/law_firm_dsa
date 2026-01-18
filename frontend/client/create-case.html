@@ -54,9 +54,26 @@
         }
 
         .lawyer-card.busy {
-            opacity: 0.6;
-            border-color: #999;
-            cursor: not-allowed;
+            opacity: 0.5;
+            border-color: #ccc !important;
+            background: #f5f5f5 !important;
+            cursor: not-allowed !important;
+            pointer-events: none;
+            position: relative;
+        }
+
+        .lawyer-card.busy::after {
+            content: '🔒 UNAVAILABLE';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(220, 0, 0, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 16px;
         }
 
         .lawyer-info {
@@ -265,13 +282,17 @@
                     ? lawyer.speciality.join(', ')
                     : lawyer.speciality;
 
+                const isBusy = (lawyer.active_cases || 0) >= 2;
+                const busyClass = isBusy ? ' busy' : '';
+                const busyBadge = isBusy ? '<span style="color: #d00; font-weight: bold; font-size: 12px;">⚠️ FULLY BOOKED</span>' : '';
+
                 return `
-                <div class="lawyer-card" data-lawyer-id="${lawyer.user_id}" onclick="selectLawyer('${lawyer.user_id}')">
+                <div class="lawyer-card${busyClass}" data-lawyer-id="${lawyer.user_id}" data-is-busy="${isBusy}" onclick="selectLawyer('${lawyer.user_id}')">
                     <div class="lawyer-info">
                         <div class="lawyer-details">
                             <h4 style="margin: 0 0 5px 0;">${lawyer.name}</h4>
                             <p style="margin: 0; font-size: 14px; color: #666;">${specialityDisplay}</p>
-                            <p class="case-count">Active cases: ${lawyer.active_cases || 0} / 2</p>
+                            <p class="case-count">Active cases: ${lawyer.active_cases || 0} / 2 ${busyBadge}</p>
                         </div>
                         <div class="lawyer-cost">
                             $${lawyer.cost_per_hearing.toLocaleString()}
@@ -284,11 +305,19 @@
 
         // Select lawyer
         function selectLawyer(lawyerId) {
+            const card = document.querySelector(`[data-lawyer-id="${lawyerId}"]`);
+            const isBusy = card.getAttribute('data-is-busy') === 'true';
+
+            // Prevent selection if lawyer is busy
+            if (isBusy) {
+                showAlert('⚠️ This lawyer is fully booked (2/2 cases). Please select another lawyer or contact us for assistance.', 'error');
+                return;
+            }
+
             // Deselect all
-            document.querySelectorAll('.lawyer-card').forEach(card => card.classList.remove('selected'));
+            document.querySelectorAll('.lawyer-card').forEach(c => c.classList.remove('selected'));
 
             // Select this one
-            const card = document.querySelector(`[data-lawyer-id="${lawyerId}"]`);
             card.classList.add('selected');
 
             const lawyer = allLawyers.find(l => l.user_id === lawyerId);

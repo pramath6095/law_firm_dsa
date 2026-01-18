@@ -15,7 +15,7 @@ from data_structures import CaseStore, UserStore, DocumentStore
 from core_logic import (
     CaseManager, AppointmentManager, MessageManager,
     DocumentManager, FollowUpManager, NotificationManager,
-    AvailableCasesPool, EventManager  # Added EventManager
+    EventManager
 )
 
 
@@ -45,8 +45,7 @@ message_manager = MessageManager()
 document_manager = DocumentManager(document_store, case_store)
 followup_manager = FollowUpManager()
 notification_manager = NotificationManager()
-available_cases_pool = AvailableCasesPool()  # NEW: Available cases pool
-event_manager = EventManager(case_store)  # NEW: Event manager
+event_manager = EventManager(case_store)  # Event manager
 
 # Firm contact information (for when all specialists are busy)
 FIRM_CONTACT_INFO = {
@@ -560,8 +559,13 @@ def lawyer_dashboard():
     # Get assigned cases
     cases = case_store.get_cases_by_lawyer(lawyer_id)
     
-    # Count urgent cases using urgency_level (not old boolean urgency)
-    urgent_cases = [c for c in cases if c.get('urgency_level') == 'urgent']
+    # Sort cases by days_until_hearing (ascending = most urgent first)
+    # Filter cases with urgency_level in ('urgent', 'high', 'normal')
+    cases_with_hearings = [c for c in cases if c.get('days_until_hearing') is not None]
+    cases_with_hearings.sort(key=lambda c: c.get('priority_score', 999))
+    
+    # Get urgent cases (for display) - cases with hearing ≤7 days
+    urgent_cases = [c for c in cases_with_hearings if c.get('urgency_level') == 'urgent']
     
     # Get pending appointment requests
     pending_requests = appointment_manager.get_pending_requests()
@@ -575,7 +579,7 @@ def lawyer_dashboard():
         'urgent_cases_count': len(urgent_cases),
         'pending_requests_count': len(pending_requests),
         'unread_notifications': unread_count,
-        'urgent_cases': urgent_cases[:5]
+        'urgent_cases': urgent_cases[:5]  # Top 5 most urgent
     })
 
 
@@ -791,9 +795,20 @@ def schedule_followup(case_id):
         case_id, lawyer_id, followup_type, scheduled_date, notes
     )
     
-    # Notify client
+    # Add to calendar as an event
     case = case_store.get_case(case_id)
     if case:
+        event_manager.add_event(
+            case_id=case_id,
+            event_type='followup',
+            date=scheduled_date,
+            description=f"{followup_type.capitalize()}: {notes if notes else 'Follow-up appointment'}",
+            case_type=case['case_type'],
+            urgency_level=case.get('urgency_level', 'normal'),
+            priority_score=case.get('priority_score', 999)
+        )
+        
+        # Notify client
         notification_manager.add_notification(
             case['client_id'],
             'followup_scheduled',

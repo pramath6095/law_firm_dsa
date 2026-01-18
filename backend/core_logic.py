@@ -25,8 +25,8 @@ from data_structures import (
 
 # Valid case state transitions
 VALID_STATE_TRANSITIONS = {
-    'created': ['in_review'],
-    'in_review': ['active', 'created'],  # Can go back to created if rejected
+    'created': ['in_review', 'active', 'closed'],  # Can mark as completed directly
+    'in_review': ['active', 'created', 'closed'],  # Can go back to created if rejected or mark complete
     'active': ['closed'],
     'closed': []  # Terminal state
 }
@@ -60,8 +60,9 @@ class CaseManager:
         else:
             urgency_level = 'normal'
         
-        # Priority score (negative days for max heap sorting)
-        priority_score = -days_until
+        # Priority score for sorting (lower = more urgent)
+        # Overdue cases get priority 0 (highest priority)
+        priority_score = max(0, days_until)
         
         case_data = {
             'case_id': case_id,
@@ -769,8 +770,12 @@ class EventManager:
         if start_date is None:
             start_date = datetime.now()
        
-        week_start = start_date - timedelta(days=start_date.weekday())
-        week_end = week_start + timedelta(days=7)
+        # Calculate week boundaries (Sunday to Saturday, matching frontend)
+        # Python's weekday(): Monday=0, Sunday=6
+        # Convert to days since Sunday: (weekday + 1) % 7
+        days_since_sunday = (start_date.weekday() + 1) % 7
+        week_start = start_date - timedelta(days=days_since_sunday)
+        week_end = week_start + timedelta(days=6)  # Sunday + 6 days = Saturday
         
         if role == 'client':
             cases = self.case_store.get_cases_by_client(user_id)
@@ -790,5 +795,6 @@ class EventManager:
                         'priority_score': case.get('priority_score', 0)
                     })
         
-        all_events.sort(key=lambda e: e.get('priority_score', 0), reverse=True)
+        # Sort by date/time ascending (chronological order for calendar)
+        all_events.sort(key=lambda e: datetime.fromisoformat(e['date']))
         return all_events
