@@ -3,7 +3,8 @@
  * Handles API communication, session management, and utilities
  */
 
-const API_BASE_URL = 'http://localhost:5000/api';
+// Use relative URL to go through nginx proxy (same-origin)
+const API_BASE_URL = '/api';
 
 // Session management
 class Session {

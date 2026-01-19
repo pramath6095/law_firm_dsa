@@ -22,15 +22,15 @@ from core_logic import (
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
-# Session configuration for CORS
+# Session configuration - using Lax since nginx proxies make all requests same-origin
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 
-# Configure CORS to allow frontend origin with credentials
+# Configure CORS (simplified since nginx proxies all /api requests)
 CORS(app, 
-     origins=['http://localhost:8000', 'http://127.0.0.1:8000'],
+     origins=['http://localhost:8000', 'http://127.0.0.1:8000', 'http://localhost:5000', 'http://127.0.0.1:5000'],
      supports_credentials=True,
-     allow_headers=['Content-Type'],
+     allow_headers=['Content-Type', 'Authorization'],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 
 # Initialize data stores

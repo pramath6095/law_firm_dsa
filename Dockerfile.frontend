@@ -1,9 +1,6 @@
 # Frontend Dockerfile - Nginx to serve static files
 FROM nginx:alpine
 
-# Install wget for health checks
-RUN apk add --no-cache wget
-
 # Copy frontend files
 COPY frontend/ /usr/share/nginx/html/
 
