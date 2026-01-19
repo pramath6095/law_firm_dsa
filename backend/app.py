@@ -15,22 +15,22 @@ from data_structures import CaseStore, UserStore, DocumentStore
 from core_logic import (
     CaseManager, AppointmentManager, MessageManager,
     DocumentManager, FollowUpManager, NotificationManager,
-    AvailableCasesPool
+    EventManager
 )
 
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
-# Session configuration for CORS
+# Session configuration - using Lax since nginx proxies make all requests same-origin
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 
-# Configure CORS to allow frontend origin with credentials
+# Configure CORS (simplified since nginx proxies all /api requests)
 CORS(app, 
-     origins=['http://localhost:8000', 'http://127.0.0.1:8000'],
+     origins=['http://localhost:8000', 'http://127.0.0.1:8000', 'http://localhost:5000', 'http://127.0.0.1:5000'],
      supports_credentials=True,
-     allow_headers=['Content-Type'],
+     allow_headers=['Content-Type', 'Authorization'],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 
 # Initialize data stores
@@ -45,20 +45,57 @@ message_manager = MessageManager()
 document_manager = DocumentManager(document_store, case_store)
 followup_manager = FollowUpManager()
 notification_manager = NotificationManager()
-available_cases_pool = AvailableCasesPool()  # NEW: Available cases pool
+event_manager = EventManager(case_store)  # Event manager
+
+# Firm contact information (for when all specialists are busy)
+FIRM_CONTACT_INFO = {
+    'phone': '+1-555-LAW-FIRM',
+    'email': 'contact@premierlegalpartners.com',
+    'message': 'All our specialists in this practice area are currently at capacity. Please contact us to discuss your case.'
+}
 
 
 # Create sample users for testing
 def init_sample_data():
     """Initialize with 5 sample lawyers and 5 sample clients"""
     
-    # Sample Lawyers
+    # Sample Lawyers with specialities and costs
     lawyers = [
-        {"id": "LAWYER-001", "name": "Sarah Mitchell", "email": "sarah.mitchell@lawfirm.com"},
-        {"id": "LAWYER-002", "name": "David Chen", "email": "david.chen@lawfirm.com"},
-        {"id": "LAWYER-003", "name": "Emily Rodriguez", "email": "emily.rodriguez@lawfirm.com"},
-        {"id": "LAWYER-004", "name": "Michael Johnson", "email": "michael.johnson@lawfirm.com"},
-        {"id": "LAWYER-005", "name": "Priya Sharma", "email": "priya.sharma@lawfirm.com"},
+        {
+            "id": "LAWYER-001", 
+            "name": "Sarah Mitchell", 
+            "email": "a@lawfirm.com",
+            "speciality": ["Civil Law", "Criminal Law"],
+            "cost_per_hearing": 5000.00
+        },
+        {
+            "id": "LAWYER-002", 
+            "name": "David Chen", 
+            "email": "b@lawfirm.com",
+            "speciality": ["Civil Law", "Criminal Law"],
+            "cost_per_hearing": 5500.00
+        },
+        {
+            "id": "LAWYER-003", 
+            "name": "Emily Rodriguez", 
+            "email": "c@lawfirm.com",
+            "speciality": ["Family Law"],
+            "cost_per_hearing": 3500.00
+        },
+        {
+            "id": "LAWYER-004", 
+            "name": "Michael Johnson", 
+            "email": "d@lawfirm.com",
+            "speciality": ["Corporate Law"],
+            "cost_per_hearing": 4500.00
+        },
+        {
+            "id": "LAWYER-005", 
+            "name": "Priya Sharma", 
+            "email": "e@lawfirm.com",
+            "speciality": ["Property Law"],
+            "cost_per_hearing": 6000.00
+        },
     ]
     
     for lawyer in lawyers:
@@ -68,16 +105,18 @@ def init_sample_data():
             'password': 'password123',
             'name': lawyer["name"],
             'phone': f'555-{lawyer["id"][-3:]}',
-            'role': 'lawyer'
+            'role': 'lawyer',
+            'speciality': lawyer["speciality"],  # List of specialities
+            'cost_per_hearing': lawyer["cost_per_hearing"]
         })
     
     # Sample Clients
     clients = [
-        {"id": "CLIENT-001", "name": "John Doe", "email": "john.doe@example.com"},
-        {"id": "CLIENT-002", "name": "Jane Smith", "email": "jane.smith@example.com"},
-        {"id": "CLIENT-003", "name": "Robert Brown", "email": "robert.brown@example.com"},
-        {"id": "CLIENT-004", "name": "Lisa Anderson", "email": "lisa.anderson@example.com"},
-        {"id": "CLIENT-005", "name": "Mark Wilson", "email": "mark.wilson@example.com"},
+        {"id": "CLIENT-001", "name": "John Doe", "email": "a@gmail.com"},
+        {"id": "CLIENT-002", "name": "Jane Smith", "email": "b@gmail.com"},
+        {"id": "CLIENT-003", "name": "Robert Brown", "email": "c@gmail.com"},
+        {"id": "CLIENT-004", "name": "Lisa Anderson", "email": "d@gmail.com"},
+        {"id": "CLIENT-005", "name": "Mark Wilson", "email": "e@gmail.com"},
     ]
     
     for client in clients:
@@ -220,6 +259,70 @@ def get_current_user():
     })
 
 
+@app.route('/api/profile', methods=['GET', 'PUT'])
+@login_required
+def profile():
+    """Get or update user profile"""
+    user_id = session['user_id']
+    user = user_store.get_user_by_id(user_id)
+    
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    
+    if request.method == 'GET':
+        # Return full profile
+        profile_data = {
+            'user_id': user['user_id'],
+            'name': user['name'],
+            'email': user['email'],
+            'phone': user.get('phone', ''),
+            'role': user['role']
+        }
+        
+        # Add lawyer-specific fields
+        if user['role'] == 'lawyer':
+            profile_data['speciality'] = user.get('speciality', [])
+            profile_data['cost_per_hearing'] = user.get('cost_per_hearing', 0)
+        
+        return jsonify(profile_data)
+    
+    elif request.method == 'PUT':
+        # Update profile - modifies dictionary directly
+        data = request.json
+        
+        # Validation
+        name = data.get('name', '').strip()
+        phone = data.get('phone', '').strip()
+        
+        if not name or len(name) < 2:
+            return jsonify({'error': 'Name must be at least 2 characters'}), 400
+        
+        if not phone:
+            return jsonify({'error': 'Phone number is required'}), 400
+        
+        # Update the dictionary directly!
+        user['name'] = name
+        user['phone'] = phone
+        
+        # Update speciality for lawyers
+        if user['role'] == 'lawyer' and 'speciality' in data:
+            speciality = data.get('speciality')
+            if isinstance(speciality, list):
+                user['speciality'] = speciality
+        
+        return jsonify({
+            'message': 'Profile updated successfully',
+            'user': {
+                'user_id': user['user_id'],
+                'name': user['name'],
+                'email': user['email'],
+                'phone': user['phone'],
+                'role': user['role']
+            }
+        })
+
+
+
 # ============================================================================
 # CLIENT ENDPOINTS
 # ============================================================================
@@ -254,6 +357,27 @@ def client_dashboard():
     })
 
 
+@app.route('/api/lawyers', methods=['GET'])
+def get_lawyers():
+    """Get all lawyers with their specialities and costs"""
+    all_lawyers = [u for u in user_store.users.values() if u.get('role') == 'lawyer']
+    
+    # Add active case count for each lawyer
+    lawyers_with_counts = []
+    for lawyer in all_lawyers:
+        lawyer_data = {
+            'user_id': lawyer['user_id'],
+            'name': lawyer['name'],
+            'email': lawyer.get('email'),
+            'speciality': lawyer.get('speciality', 'General Law'),
+            'cost_per_hearing': lawyer.get('cost_per_hearing', 0),
+            'active_cases': case_manager.get_lawyer_case_count(lawyer['user_id'])
+        }
+        lawyers_with_counts.append(lawyer_data)
+    
+    return jsonify({'lawyers': lawyers_with_counts})
+
+
 @app.route('/api/client/cases', methods=['GET', 'POST'])
 @login_required
 @role_required('client')
@@ -270,46 +394,72 @@ def client_cases():
         
         case_type = data.get('case_type')
         description = data.get('description')
-        urgency = data.get('urgency', False)
-        assignment_type = data.get('assignment_type', 'general')  # 'general' or 'direct'
-        requested_lawyer_id = data.get('lawyer_id')  # Only if assignment_type is 'direct'
+        hearing_date = data.get('hearing_date')  # Required
+        selected_lawyer_id = data.get('lawyer_id')  # Required - client must select a lawyer
+        speciality = data.get('speciality')  # For fallback search
         
-        if not case_type or not description:
-            return jsonify({'error': 'Case type and description required'}), 400
+        # Validation
+        if not all([case_type, description, hearing_date, selected_lawyer_id, speciality]):
+            return jsonify({'error': 'All fields required: case_type, description, hearing_date, lawyer_id, speciality'}), 400
         
-        # Create case
-        case = case_manager.create_case(client_id, case_type, description, urgency)
+        # Validate description minimum 50 words (using string data type operations)
+        # Split description into words and count non-empty strings
+        words = [word for word in description.split() if word.strip()]
+        word_count = len(words)
         
-        # Add additional fields for assignment
-        case['assignment_type'] = assignment_type
-        if assignment_type == 'direct' and requested_lawyer_id:
-            case['requested_lawyer_id'] = requested_lawyer_id
+        if word_count < 50:
+            return jsonify({
+                'error': f'Description must be at least 50 words. Current: {word_count} words.',
+                'word_count': word_count,
+                'required': 50
+            }), 400
         
-        # Add to available cases pool
-        available_cases_pool.add_to_pool(case)
+        # Attempt assignment with auto-fallback
+        result_type, case, extra = case_manager.create_case_with_assignment(
+            client_id, case_type, description, hearing_date,
+            selected_lawyer_id, speciality, user_store
+        )
         
-        # Update case in store with lawyer if claimed/requested
-        if assignment_type == 'direct' and requested_lawyer_id:
-            # For direct assignment, notify the lawyer
+        if result_type == 'success':
+            # Assigned to selected lawyer
             notification_manager.add_notification(
-                requested_lawyer_id,
-                'direct_assignment_request',
-                f'New direct assignment request: {case["case_id"]}',
+                selected_lawyer_id, 'new_case_assigned',
+                f'New case assigned: {case["case_id"]} ({case["urgency_level"]} priority) - Hearing in {case["days_until_hearing"]} days',
                 case['case_id']
             )
-        else:
-            # For general pool, notify all lawyers
-            all_users = list(user_store.users.values())
-            for user in all_users:
-                if user.get('role') == 'lawyer':
-                    notification_manager.add_notification(
-                        user['user_id'],
-                        'new_available_case',
-                        f'New {"urgent" if urgency else ""} case available: {case["case_id"]}',
-                        case['case_id']
-                    )
+            return jsonify({
+                'message': 'Case created and assigned successfully',
+                'case': case,
+                'assigned_to': selected_lawyer_id,
+                'assignment_status': 'success'
+            }), 201
         
-        return jsonify({'message': 'Case created', 'case': case}), 201
+        elif result_type == 'auto_assigned':
+            # Assigned to alternative lawyer
+            alternative_lawyer = extra
+            notification_manager.add_notification(
+                alternative_lawyer['user_id'], 'new_case_assigned',
+                f'New case auto-assigned: {case["case_id"]} ({case["urgency_level"]} priority) - Hearing in {case["days_until_hearing"]} days',
+                case['case_id']
+            )
+            return jsonify({
+                'message': f'Your selected lawyer is busy. Case assigned to {alternative_lawyer["name"]}.',
+                'case': case,
+                'assigned_to': alternative_lawyer['user_id'],
+                'assigned_to_name': alternative_lawyer['name'],
+                'assignment_status': 'auto_assigned'
+            }), 201
+        
+        else:  # all_busy
+            return jsonify({
+                'error': 'all_specialists_busy',
+                'message': FIRM_CONTACT_INFO['message'],
+                'contact': {
+                    'phone': FIRM_CONTACT_INFO['phone'],
+                    'email': FIRM_CONTACT_INFO['email']
+                }
+            }), 503  # Service Unavailable
+        
 
 
 @app.route('/api/client/cases/<case_id>', methods=['GET'])
@@ -472,7 +622,14 @@ def lawyer_dashboard():
     
     # Get assigned cases
     cases = case_store.get_cases_by_lawyer(lawyer_id)
-    urgent_cases = [c for c in cases if c.get('urgency')]
+    
+    # Sort cases by days_until_hearing (ascending = most urgent first)
+    # Filter cases with urgency_level in ('urgent', 'high', 'normal')
+    cases_with_hearings = [c for c in cases if c.get('days_until_hearing') is not None]
+    cases_with_hearings.sort(key=lambda c: c.get('priority_score', 999))
+    
+    # Get urgent cases (for display) - cases with hearing ≤7 days
+    urgent_cases = [c for c in cases_with_hearings if c.get('urgency_level') == 'urgent']
     
     # Get pending appointment requests
     pending_requests = appointment_manager.get_pending_requests()
@@ -486,7 +643,7 @@ def lawyer_dashboard():
         'urgent_cases_count': len(urgent_cases),
         'pending_requests_count': len(pending_requests),
         'unread_notifications': unread_count,
-        'urgent_cases': urgent_cases[:5]
+        'urgent_cases': urgent_cases[:5]  # Top 5 most urgent
     })
 
 
@@ -702,9 +859,18 @@ def schedule_followup(case_id):
         case_id, lawyer_id, followup_type, scheduled_date, notes
     )
     
-    # Notify client
+    # Add to calendar as an event
     case = case_store.get_case(case_id)
     if case:
+        event_manager.add_event(
+            case_id=case_id,
+            event_type='followup',
+            date=scheduled_date,
+            description=f"{followup_type.capitalize()}: {notes if notes else 'Follow-up appointment'}",
+            created_by=lawyer_id
+        )
+        
+        # Notify client
         notification_manager.add_notification(
             case['client_id'],
             'followup_scheduled',
@@ -959,10 +1125,64 @@ def urgency_distribution():
 
 
 # ============================================================================
+# CALENDAR AND EVENT MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@app.route('/api/calendar/week', methods=['GET'])
+@login_required
+def get_weekly_calendar():
+    """Get all events for the current week"""
+    user_id = session['user_id']
+    role = session['role']
+    
+    # Optional: specify week start date
+    start_date_str = request.args.get('start_date')
+    start_date = datetime.fromisoformat(start_date_str) if start_date_str else None
+    
+    events = event_manager.get_weekly_events(user_id, role, start_date)
+    
+    return jsonify({
+        'events': events,
+        'week_start': (start_date or datetime.now()).strftime('%Y-%m-%d')
+    })
+
+
+@app.route('/api/cases/<case_id>/events', methods=['POST'])
+@login_required
+@role_required('lawyer')
+def create_event(case_id):
+    """Lawyer creates hearing/appointment/follow-up"""
+    data = request.json
+    lawyer_id = session['user_id']
+    
+    # Check lawyer owns this case
+    if not case_manager.check_access(case_id, lawyer_id, 'lawyer'):
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    event = event_manager.add_event(
+        case_id,
+        data.get('event_type'),
+        data.get('date'),
+        data.get('description'),
+        lawyer_id
+    )
+    
+    case = case_store.get_case(case_id)
+    notification_manager.add_notification(
+        case['client_id'],
+        f'new_{event["event_type"]}',
+        f'New {event["event_type"]} scheduled for {event["date"]}',
+        case_id
+    )
+    
+    return jsonify({'event': event}), 201
+
+
+# ============================================================================
 # START SERVER
 # ============================================================================
 
 if __name__ == '__main__':
     print("Legal Case Management System - Backend")
     print("Server starting on http://localhost:5000")
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)

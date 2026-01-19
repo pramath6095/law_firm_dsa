@@ -11,25 +11,33 @@
 <body>
     <div class="header">
         <div class="header-content">
-            <h1>Legal Case Management</h1>
+            <h1>Legal Case Management - Client Portal</h1>
             <nav class="nav-links">
                 <a href="dashboard.html">Dashboard</a>
                 <a href="my-cases.html">My Cases</a>
-                <a href="profile.html">Profile</a>
+                <a href="create-case.html">Create Case</a>
                 <button class="btn btn-secondary" onclick="handleLogout()">Logout</button>
             </nav>
         </div>
     </div>
 
     <div class="container">
-        <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h2>My Cases</h2>
-                <a href="create-case.html" class="btn btn-primary">Create New Case</a>
-            </div>
+        <h2>My Cases</h2>
 
-            <div id="cases-list">
-                <p class="loading">Loading cases...</p>
+        <div class="tabs">
+            <button class="tab active" data-tab="active">Active Cases</button>
+            <button class="tab" data-tab="closed">Closed Cases</button>
+        </div>
+
+        <div id="active" class="tab-content active">
+            <div id="active-cases-list">
+                <p class="loading">Loading active cases...</p>
+            </div>
+        </div>
+
+        <div id="closed" class="tab-content">
+            <div id="closed-cases-list">
+                <p class="loading">Loading closed cases...</p>
             </div>
         </div>
     </div>
@@ -40,40 +48,60 @@
             // Redirected
         }
 
+        let allCases = [];
+
         async function loadCases() {
             try {
                 const data = await API.getClientCases();
-                const casesDiv = document.getElementById('cases-list');
+                allCases = data.cases || [];
 
-                if (data.cases && data.cases.length > 0) {
-                    casesDiv.innerHTML = data.cases.map(c => `
-                        <div class="case-item ${c.urgency ? 'urgent' : ''}" 
-                             onclick="window.location.href='case-details.html?id=${c.case_id}'">
-                            <div class="case-id">${c.case_id}</div>
-                            <div class="case-type">${c.case_type}</div>
-                            <div class="case-status">
-                                <span class="case-status status-${c.status}">${formatStatus(c.status)}</span>
-                                ${c.urgency ? '<span class="urgent-badge">Urgent</span>' : ''}
-                            </div>
-                            <p class="text-muted" style="margin-top: 8px; font-size: 13px;">
-                                Created: ${formatDate(c.created_at)}
-                            </p>
-                        </div>
-                    `).join('');
-                } else {
-                    casesDiv.innerHTML = `
-                        <div class="empty-state">
-                            <p>No cases yet</p>
-                            <a href="create-case.html" class="btn btn-primary mt-2">Create Your First Case</a>
-                        </div>
-                    `;
-                }
+                // Separate active and closed cases
+                const activeCases = allCases.filter(c => c.status !== 'closed');
+                const closedCases = allCases.filter(c => c.status === 'closed');
+
+                // Sort by created_at descending (latest first - LIFO/Stack order)
+                activeCases.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                closedCases.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+                displayCases('active-cases-list', activeCases);
+                displayCases('closed-cases-list', closedCases);
+
             } catch (error) {
                 console.error('Error loading cases:', error);
                 showAlert('Error loading cases: ' + error.message, 'error');
             }
         }
 
+        function displayCases(containerId, cases) {
+            const casesDiv = document.getElementById(containerId);
+
+            if (cases && cases.length > 0) {
+                casesDiv.innerHTML = cases.map(c => {
+                    const urgencyClass = c.urgency_level === 'urgent' ? 'urgent' :
+                        c.urgency_level === 'high' ? 'high' : 'normal';
+                    const daysText = c.days_until_hearing !== undefined ?
+                        `Hearing in ${c.days_until_hearing} days` : '';
+
+                    return `
+                    <div class="case-item ${urgencyClass}" onclick="window.location.href='case-details.html?id=${c.case_id}'">
+                        <div class="case-header">
+                            <div class="case-id">${c.case_id}</div>
+                            <span class="case-status status-${c.status}">${formatStatus(c.status)}</span>
+                        </div>
+                        <div class="case-info">
+                            <div class="case-type">${c.case_type}</div>
+                            <div class="case-lawyer">Lawyer: ${c.lawyer_id || 'Not assigned'}</div>
+                        </div>
+                        ${daysText ? `<div class="case-days">${daysText}</div>` : ''}
+                    </div>
+                `}).join('');
+            } else {
+                casesDiv.innerHTML = `<p class="text-muted">No ${containerId.includes('active') ? 'active' : 'closed'} cases</p>`;
+            }
+        }
+
+        // Tab functionality
+        initTabs();
         loadCases();
     </script>
 </body>

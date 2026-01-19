@@ -205,7 +205,8 @@
             <h2>This Week's Schedule</h2>
             <p class="text-muted" style="margin-bottom: 20px;">Weekly calendar view (Monday - Sunday)</p>
 
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
                 <button class="btn btn-secondary" onclick="previousWeek()">← Previous Week</button>
                 <div style="font-size: 18px; font-weight: 600;" id="week-range"></div>
                 <button class="btn btn-secondary" onclick="nextWeek()">Next Week →</button>
@@ -301,82 +302,55 @@
                     `${currentWeekStart.toLocaleDateString('en-US', dateOptions)} - ${weekEnd.toLocaleDateString('en-US', dateOptions)}`;
 
                 const eventsDiv = document.getElementById('weekly-events');
-
-                // Create day columns for the week (Monday - Sunday)
-                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-                const eventsByDay = {};
-
-                // Initialize empty arrays for each day
-                days.forEach(day => eventsByDay[day] = []);
-
-                // Group events by day
                 if (data.events && data.events.length > 0) {
-                    data.events.forEach(event => {
+                    eventsDiv.innerHTML = data.events.map(event => {
                         const eventDate = new Date(event.date);
-                        const dayName = eventDate.toLocaleDateString('en-US', { weekday: 'long' });
-                        if (eventsByDay[dayName]) {
-                            eventsByDay[dayName].push(event);
-                        }
-                    });
-                }
+                        const urgencyClass = event.urgency_level === 'urgent' ? 'urgent' :
+                            event.urgency_level === 'high' ? 'high-priority' : 'normal';
 
-                // Build grid HTML
-                let gridHTML = '<div class="calendar-grid">';
+                        const urgencyBadge = event.urgency_level === 'urgent' ? '🔴 URGENT' :
+                            event.urgency_level === 'high' ? '🟡 HIGH' : '🟢 NORMAL';
 
-                days.forEach((day, index) => {
-                    const dayDate = new Date(currentWeekStart);
-                    // Sunday is 0, Monday is 1, etc. Adjust index for Monday-first week
-                    dayDate.setDate(dayDate.getDate() + (index + 1) % 7);
+                        const typeClass = `event-type-${event.event_type}`;
+                        const typeLabel = event.event_type.charAt(0).toUpperCase() + event.event_type.slice(1);
 
-                    const dayEvents = eventsByDay[day] || [];
-
-                    gridHTML += `
-                        <div class="day-column">
-                            <div class="day-header">
-                                <div class="day-name">${day}</div>
-                                <div class="day-date">${dayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-                            </div>
-                            <div class="day-events">
-                    `;
-
-                    if (dayEvents.length === 0) {
-                        gridHTML += '<div class="no-events">No events</div>';
-                    } else {
-                        dayEvents.forEach(event => {
-                            const eventDate = new Date(event.date);
-                            const urgencyClass = event.urgency_level === 'urgent' ? 'urgent' :
-                                event.urgency_level === 'high' ? 'high-priority' : 'normal';
-                            const typeClass = `event-type-${event.event_type}`;
-                            const typeLabel = event.event_type.charAt(0).toUpperCase() + event.event_type.slice(1);
-
-                            gridHTML += `
-                                <div class="event-item ${urgencyClass}" onclick="window.location.href='case-details.html?id=${event.case_id}'">
-                                    <div class="event-time">
-                                        ${eventDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                                    </div>
-                                    <div class="event-desc">
-                                        <strong>${event.description || 'No description'}</strong>
-                                    </div>
+                        return `
+                            <div class="event-item ${urgencyClass}" onclick="window.location.href='case-details.html?id=${event.case_id}'">
+                                <div class="event-header">
                                     <div>
-                                        <span class="event-type-badge ${typeClass}">${typeLabel}</span>
+                                        <div class="event-date">
+                                            ${eventDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                                        </div>
+                                        <div class="event-time">
+                                            ${eventDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
                                     </div>
-                                    <div style="margin-top: 5px; font-size: 11px; color: #888;">
-                                        ${event.case_id}
+                                    <div style="text-align: right;">
+                                        <span class="event-type-badge ${typeClass}">${typeLabel}</span>
+                                        <div style="margin-top: 5px;">
+                                            <span class="urgency-badge-display">${urgencyBadge}</span>
+                                        </div>
                                     </div>
                                 </div>
-                            `;
-                        });
-                    }
-
-                    gridHTML += `
+                                <div style="margin-top: 10px;">
+                                    <strong>${event.description || 'No description'}</strong>
+                                </div>
+                                <div style="margin-top: 5px; font-size: 13px; color: #666;">
+                                    Case: ${event.case_id} (${event.case_type})
+                                </div>
+                                ${event.urgency_level === 'urgent' ?
+                                '<div style="margin-top: 8px; font-size: 12px; color: #d00; font-weight: 600;">⏰ Within 7 days - High Priority!</div>' : ''}
                             </div>
+                        `;
+                    }).join('');
+                } else {
+                    eventsDiv.innerHTML = `
+                        <div class="empty-calendar">
+                            <p style="font-size: 18px;">📅 No events scheduled this week</p>
+                            <p>Your calendar is clear!</p>
                         </div>
                     `;
-                });
-
-                gridHTML += '</div>';
-                eventsDiv.innerHTML = gridHTML;
-
+                }
             } catch (error) {
                 console.error('Error loading calendar:', error);
                 document.getElementById('weekly-events').innerHTML = '<p class="text-muted">Error loading events</p>';
