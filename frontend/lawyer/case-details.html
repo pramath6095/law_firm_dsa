@@ -14,8 +14,7 @@
             <h1>Legal Case Management - Lawyer Portal</h1>
             <nav class="nav-links">
                 <a href="dashboard.html">Dashboard</a>
-                <a href="consultation-requests.html">Requests</a>
-                <a href="cases.html">Cases</a>
+                <a href="cases.html">My Cases</a>
                 <a href="profile.html">Profile</a>
                 <button class="btn btn-secondary" onclick="handleLogout()">Logout</button>
             </nav>
@@ -29,14 +28,11 @@
             </div>
 
             <div class="btn-group" id="case-actions" style="margin-top: 15px; display: none;">
-                <button class="btn btn-danger" onclick="rejectCase()">Reject Case (→ General Pool)</button>
-                <button class="btn btn-warning" onclick="unclaimCase()">Un-claim Case (Return to Pool)</button>
                 <button class="btn btn-success" onclick="markComplete()">Mark as Completed</button>
             </div>
 
             <div class="tabs">
                 <button class="tab active" data-tab="overview">Overview</button>
-                <button class="tab" data-tab="appointments">Appointments</button>
                 <button class="tab" data-tab="updates">Case Updates</button>
                 <button class="tab" data-tab="messages">Messages</button>
                 <button class="tab" data-tab="documents">Documents</button>
@@ -145,54 +141,11 @@
             // Redirected
         }
 
-        // Update navigation
-        document.querySelector('.nav-links').innerHTML = `
-            <a href="dashboard.html">Dashboard</a>
-            <a href="available-cases.html">Available Cases</a>
-            <a href="pending-requests.html">My Requests</a>
-            <a href="cases.html">My Cases</a>
-            <a href="profile.html">Profile</a>
-            <button class="btn btn-secondary" onclick="handleLogout()">Logout</button>
-        `;
-
         const urlParams = new URLSearchParams(window.location.search);
         const caseId = urlParams.get('id');
 
         if (!caseId) {
             window.location.href = 'cases.html';
-        }
-
-        let caseData = {};
-
-        async function unclaimCase() {
-            if (!confirm('Un-claim this case? It will be returned to the available cases pool.')) return;
-
-            try {
-                await API.unclaimCase(caseId);
-                showAlert('Case returned to pool', 'success');
-                setTimeout(() => {
-                    window.location.href = 'cases.html';
-                }, 1000);
-            } catch (error) {
-                showAlert('Error un-claiming case: ' + error.message, 'error');
-            }
-        }
-
-        async function rejectCase() {
-            const reason = prompt('Enter rejection reason (case will go to general pool):');
-            if (!reason) return;
-
-            if (!confirm('Reject this case and send to general pool for all lawyers?')) return;
-
-            try {
-                await API.unclaimCase(caseId); // Same as unclaim but with reason
-                showAlert(`Case rejected: ${reason}. Sent to general pool.`, 'success');
-                setTimeout(() => {
-                    window.location.href = 'cases.html';
-                }, 1500);
-            } catch (error) {
-                showAlert('Error rejecting case: ' + error.message, 'error');
-            }
         }
 
         async function markComplete() {

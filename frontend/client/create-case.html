@@ -6,6 +6,128 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create New Case - Legal Case Management</title>
     <link rel="stylesheet" href="../styles.css">
+    <style>
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding: 20px 0;
+        }
+
+        .step {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            background: var(--bg-white);
+            margin: 0 5px;
+            border-radius: 5px;
+            font-weight: 500;
+            color: var(--text-gray);
+            border: 2px solid var(--border-color);
+        }
+
+        .step.active {
+            background: var(--primary-color);
+            color: #0f172a;
+            font-weight: 600;
+            border-color: var(--primary-color);
+        }
+
+        .step.completed {
+            background: var(--success-color);
+            color: #0f172a;
+            font-weight: 600;
+            border-color: var(--success-color);
+        }
+
+        .lawyer-card {
+            border: 2px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .lawyer-card:hover {
+            border-color: var(--primary-color);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .lawyer-card.selected {
+            border-color: var(--primary-color);
+            background: #f0f8ff;
+        }
+
+        .lawyer-card.busy {
+            opacity: 0.5;
+            border-color: #ccc !important;
+            background: #f5f5f5 !important;
+            cursor: not-allowed !important;
+            pointer-events: none;
+            position: relative;
+        }
+
+        .lawyer-card.busy::after {
+            content: '🔒 UNAVAILABLE';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(220, 0, 0, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .lawyer-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .lawyer-details {
+            flex: 1;
+        }
+
+        .lawyer-cost {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .case-count {
+            font-size: 12px;
+            color: var(--text-gray);
+        }
+
+        #modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        #modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 500px;
+            text-align: center;
+        }
+    </style>
 </head>
 
 <body>
@@ -22,54 +144,80 @@
     </div>
 
     <div class="container">
-        <div class="card" style="max-width: 600px; margin: 0 auto;">
+        <div class="card" style="max-width: 800px; margin: 0 auto;">
             <h2>Create New Case</h2>
+
+            <div class="step-indicator">
+                <div class="step active" id="step1">1. Legal Domain</div>
+                <div class="step" id="step2">2. Select Lawyer</div>
+                <div class="step" id="step3">3. Case Details</div>
+            </div>
 
             <div id="message-area"></div>
 
             <form id="create-case-form">
-                <div class="form-group">
-                    <label for="case-type">Case Type *</label>
-                    <select id="case-type" required>
-                        <option value="">Select type...</option>
-                        <option value="Civil">Civil Law</option>
-                        <option value="Criminal">Criminal Law</option>
-                        <option value="Family">Family Law</option>
-                        <option value="Corporate">Corporate Law</option>
-                        <option value="Property">Property Law</option>
-                        <option value="Other">Other</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="description">Case Description *</label>
-                    <textarea id="description" required placeholder="Describe your legal issue in detail..."></textarea>
-                </div>
-
-                <div class="form-group">
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="urgency">
-                        <label for="urgency" style="margin-bottom: 0;">
-                            Mark as Urgent (will be prioritized in queue)
-                        </label>
+                <!-- Step 1: Domain Selection -->
+                <div id="domain-step" class="form-step">
+                    <div class="form-group">
+                        <label for="case-type">What type of legal help do you need? *</label>
+                        <select id="case-type" required>
+                            <option value="">Select legal domain...</option>
+                            <option value="Civil">Civil Law (Disputes, Contracts, Property Issues)</option>
+                            <option value="Criminal">Criminal Law (Criminal Defense, Charges)</option>
+                            <option value="Family">Family Law (Divorce, Custody, Adoption)</option>
+                            <option value="Corporate">Corporate Law (Business, Contracts)</option>
+                            <option value="Property">Property Law (Real Estate, Land Issues)</option>
+                            <option value="Tax">Tax Law (Tax Disputes, Planning)</option>
+                            <option value="Employment">Employment Law (Workplace Issues)</option>
+                        </select>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="lawyer-selection">Assign To *</label>
-                    <select id="lawyer-selection" required>
-                        <option value="general">Send to All Lawyers (Available Cases Pool)</option>
-                    </select>
-                    <p class="text-muted" style="font-size: 12px; margin-top: 5px;">
-                        Send to all lawyers or select a specific lawyer for direct assignment
-                    </p>
+                <!-- Step 2: Lawyer Selection -->
+                <div id="lawyer-step" class="form-step" style="display: none;">
+                    <h3>Available <span id="selected-domain"></span> Specialists</h3>
+                    <div id="lawyers-list"></div>
+                    <input type="hidden" id="selected-lawyer-id">
                 </div>
 
-                <div class="btn-group">
-                    <button type="submit" class="btn btn-primary">Create Case</button>
-                    <a href="my-cases.html" class="btn btn-secondary">Cancel</a>
+                <!-- Step 3: Case Details -->
+                <div id="details-step" class="form-step" style="display: none;">
+                    <div class="form-group">
+                        <label for="description">Case Description *</label>
+                        <textarea id="description" required
+                            placeholder="Describe your legal issue in detail (minimum 50 words)..." rows="5"></textarea>
+                        <small id="word-count" style="color: #666;">0 / 50 words minimum</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="hearing-date">Court Hearing Date & Time *</label>
+                        <input type="datetime-local" id="hearing-date" required>
+                        <small>When is your court hearing scheduled?</small>
+                    </div>
+
+                    <div class="form-group">
+                        <p><strong>Selected Lawyer:</strong> <span id="selected-lawyer-name"></span></p>
+                        <p><strong>Speciality:</strong> <span id="selected-lawyer-spec"></span></p>
+                        <p><strong>Cost per Hearing:</strong> $<span id="selected-lawyer-cost"></span></p>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Create Case</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- All Busy Modal -->
+    <div id="modal">
+        <div class="modal-content">
+            <h2>⚠️ All Specialists Busy</h2>
+            <p id="modal-message"></p>
+            <p style="margin: 20px 0;">
+                <strong>Contact Us:</strong><br>
+                📞 <span id="modal-phone"></span><br>
+                ✉️ <span id="modal-email"></span>
+            </p>
+            <button class="btn btn-primary" onclick="closeModal()">Close</button>
         </div>
     </div>
 
@@ -79,65 +227,229 @@
             // Redirected
         }
 
-        // Load lawyers for selection
+        let allLawyers = [];
+        let currentStep = 1;
+
+        // Load all lawyers on page load
         async function loadLawyers() {
             try {
-                const data = await API.getAllLawyers();
-                const lawyerSelect = document.getElementById('lawyer-selection');
-
-                // Add lawyer options
-                data.lawyers.forEach(lawyer => {
-                    const option = document.createElement('option');
-                    option.value = lawyer.user_id;
-                    option.textContent = `${lawyer.name} (Direct Assignment)`;
-                    lawyerSelect.appendChild(option);
-                });
+                const data = await API.getLawyers();
+                allLawyers = data.lawyers || [];
             } catch (error) {
                 console.error('Error loading lawyers:', error);
             }
         }
 
-        loadLawyers();
+        // Step 1: Domain selection
+        document.getElementById('case-type').addEventListener('change', (e) => {
+            const domain = e.target.value;
+            if (domain) {
+                document.getElementById('selected-domain').textContent = domain;
+                showLawyers(domain);
+                goToStep(2);
+            }
+        });
 
+        // Show lawyers filtered by domain
+        function showLawyers(domain) {
+            const domainMap = {
+                'Civil': 'Civil Law',
+                'Criminal': 'Criminal Law',
+                'Family': 'Family Law',
+                'Corporate': 'Corporate Law',
+                'Property': 'Property Law',
+                'Tax': 'Tax Law',
+                'Employment': 'Employment Law'
+            };
+
+            const targetSpeciality = domainMap[domain] || domain;
+
+            // Filter lawyers who have this speciality in their list
+            const filteredLawyers = allLawyers.filter(l => {
+                const specialities = Array.isArray(l.speciality) ? l.speciality : [l.speciality];
+                return specialities.includes(targetSpeciality);
+            });
+
+            const lawyersList = document.getElementById('lawyers-list');
+
+            if (filteredLawyers.length === 0) {
+                lawyersList.innerHTML = `
+                    <div class="alert alert-warning">
+                        No lawyers available for ${domain} law at the moment.
+                        <p style="margin-top: 10px;">Contact us: +1-555-LAW-FIRM</p>
+                    </div>
+                `;
+                return;
+            }
+
+            lawyersList.innerHTML = filteredLawyers.map(lawyer => {
+                // Format specialities for display
+                const specialityDisplay = Array.isArray(lawyer.speciality)
+                    ? lawyer.speciality.join(', ')
+                    : lawyer.speciality;
+
+                const isBusy = (lawyer.active_cases || 0) >= 2;
+                const busyClass = isBusy ? ' busy' : '';
+                const busyBadge = isBusy ? '<span style="color: #d00; font-weight: bold; font-size: 12px;">⚠️ FULLY BOOKED</span>' : '';
+
+                return `
+                <div class="lawyer-card${busyClass}" data-lawyer-id="${lawyer.user_id}" data-is-busy="${isBusy}" onclick="selectLawyer('${lawyer.user_id}')">
+                    <div class="lawyer-info">
+                        <div class="lawyer-details">
+                            <h4 style="margin: 0 0 5px 0;">${lawyer.name}</h4>
+                            <p style="margin: 0; font-size: 14px; color: #666;">${specialityDisplay}</p>
+                            <p class="case-count">Active cases: ${lawyer.active_cases || 0} / 2 ${busyBadge}</p>
+                        </div>
+                        <div class="lawyer-cost">
+                            $${lawyer.cost_per_hearing.toLocaleString()}
+                            <div style="font-size: 12px; font-weight: normal; color: #666;">per hearing</div>
+                        </div>
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        // Select lawyer
+        function selectLawyer(lawyerId) {
+            const card = document.querySelector(`[data-lawyer-id="${lawyerId}"]`);
+            const isBusy = card.getAttribute('data-is-busy') === 'true';
+
+            // Prevent selection if lawyer is busy
+            if (isBusy) {
+                showAlert('⚠️ This lawyer is fully booked (2/2 cases). Please select another lawyer or contact us for assistance.', 'error');
+                return;
+            }
+
+            // Deselect all
+            document.querySelectorAll('.lawyer-card').forEach(c => c.classList.remove('selected'));
+
+            // Select this one
+            card.classList.add('selected');
+
+            const lawyer = allLawyers.find(l => l.user_id === lawyerId);
+
+            document.getElementById('selected-lawyer-id').value = lawyerId;
+            document.getElementById('selected-lawyer-name').textContent = lawyer.name;
+            document.getElementById('selected-lawyer-spec').textContent = lawyer.speciality;
+            document.getElementById('selected-lawyer-cost').textContent = lawyer.cost_per_hearing.toLocaleString();
+
+            // Auto-advance to step 3
+            setTimeout(() => goToStep(3), 500);
+        }
+
+        // Step navigation
+        function goToStep(step) {
+            currentStep = step;
+
+            // Hide all steps
+            document.querySelectorAll('.form-step').forEach(s => s.style.display = 'none');
+
+            // Update step indicators
+            for (let i = 1; i <= 3; i++) {
+                const stepEl = document.getElementById(`step${i}`);
+                stepEl.classList.remove('active', 'completed');
+                if (i < step) stepEl.classList.add('completed');
+                else if (i === step) stepEl.classList.add('active');
+            }
+
+            // Show current step
+            if (step === 1) document.getElementById('domain-step').style.display = 'block';
+            else if (step === 2) document.getElementById('lawyer-step').style.display = 'block';
+            else if (step === 3) document.getElementById('details-step').style.display = 'block';
+        }
+
+        // Word count tracker for description (using string data type operations)
+        document.getElementById('description').addEventListener('input', (e) => {
+            const text = e.target.value;
+            const words = text.trim().split(/\s+/).filter(word => word.length > 0);
+            const wordCount = words.length;
+            const counter = document.getElementById('word-count');
+
+            counter.textContent = `${wordCount} / 50 words minimum`;
+
+            // Color code based on word count
+            if (wordCount < 50) {
+                counter.style.color = '#d00';  // Red
+            } else {
+                counter.style.color = '#080';  // Green
+            }
+        });
+
+        // Form submission
         document.getElementById('create-case-form').addEventListener('submit', async (e) => {
             e.preventDefault();
 
             const caseType = document.getElementById('case-type').value;
             const description = document.getElementById('description').value;
-            const urgency = document.getElementById('urgency').checked;
-            const lawyerSelection = document.getElementById('lawyer-selection').value;
+            const hearingDate = document.getElementById('hearing-date').value;
+            const selectedLawyerId = document.getElementById('selected-lawyer-id').value;
             const messageArea = document.getElementById('message-area');
+            const submitBtn = e.target.querySelector('button[type="submit"]');
 
             messageArea.innerHTML = '';
+
+            // Validate hearing date is in the future
+            if (new Date(hearingDate) <= new Date()) {
+                messageArea.innerHTML = '<div class="alert alert-error">Hearing date must be in the future</div>';
+                return;
+            }
+
+            // Disable submit button to prevent double-submission
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating Case...';
 
             try {
                 const caseData = {
                     case_type: caseType,
                     description: description,
-                    urgency: urgency
+                    hearing_date: hearingDate,
+                    lawyer_id: selectedLawyerId,
+                    speciality: document.getElementById('selected-lawyer-spec').textContent
                 };
-
-                // Add assignment type
-                if (lawyerSelection === 'general') {
-                    caseData.assignment_type = 'general';
-                } else {
-                    caseData.assignment_type = 'direct';
-                    caseData.lawyer_id = lawyerSelection;
-                }
 
                 const response = await API.createCase(caseData);
 
-                showAlert('Case created successfully!', 'success');
+                if (response.assignment_status === 'auto_assigned') {
+                    showAlert(`Case created! Your selected lawyer was busy, so we assigned it to ${response.assigned_to_name}.`, 'success');
+                } else {
+                    const urgencyBadge = response.case.urgency_level === 'urgent' ? '🔴' :
+                        response.case.urgency_level === 'high' ? '🟡' : '🟢';
+                    showAlert(`Case created successfully! ${urgencyBadge} ${response.case.urgency_level.toUpperCase()} priority (Hearing in ${response.case.days_until_hearing} days)`, 'success');
+                }
 
-                // Redirect to my cases
+                // Redirect to dashboard
                 setTimeout(() => {
-                    window.location.href = 'my-cases.html';
-                }, 1000);
+                    window.location.href = 'dashboard.html';
+                }, 1500);
 
             } catch (error) {
-                messageArea.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+                // Check if all specialists are busy (503 error)
+                if (error.statusCode === 503 && error.data) {
+                    showAllBusyModal(error.data.message, error.data.contact);
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Create Case';
+                } else {
+                    messageArea.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Create Case';
+                }
             }
         });
+
+        function showAllBusyModal(message, contact) {
+            document.getElementById('modal-message').textContent = message;
+            document.getElementById('modal-phone').textContent = contact.phone;
+            document.getElementById('modal-email').textContent = contact.email;
+            document.getElementById('modal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('show');
+            window.location.href = 'dashboard.html';
+        }
+
+        // Initialize
+        loadLawyers();
     </script>
 </body>
 

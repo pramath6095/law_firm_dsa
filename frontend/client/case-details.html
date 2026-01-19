@@ -29,7 +29,6 @@
 
             <div class="tabs">
                 <button class="tab active" data-tab="overview">Overview</button>
-                <button class="tab" data-tab="appointments">Appointments</button>
                 <button class="tab" data-tab="updates">Case Updates</button>
                 <button class="tab" data-tab="messages">Messages</button>
                 <button class="tab" data-tab="documents">Documents</button>
@@ -41,18 +40,7 @@
                 <div id="overview-content"></div>
             </div>
 
-            <!-- Appointments Tab -->
-            <div id="appointments" class="tab-content">
-                <h3>Request New Appointment</h3>
-                <form id="appointment-form">
-                    <div class="form-group">
-                        <label for="preferred-datetime">Preferred Date & Time</label>
-                        <input type="datetime-local" id="preferred-datetime" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Request Appointment</button>
-                </form>
-                <div id="appointment-message"></div>
-            </div>
+
 
             <!-- Updates Tab -->
             <div id="updates" class="tab-content">
@@ -196,20 +184,7 @@
             }
         }
 
-        // Appointment form
-        document.getElementById('appointment-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const datetime = document.getElementById('preferred-datetime').value;
-            const messageDiv = document.getElementById('appointment-message');
 
-            try {
-                await API.requestAppointment(caseId, new Date(datetime).toISOString());
-                messageDiv.innerHTML = '<div class="alert alert-success">Appointment requested successfully!</div>';
-                document.getElementById('appointment-form').reset();
-            } catch (error) {
-                messageDiv.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
-            }
-        });
 
         // Message form
         document.getElementById('message-form').addEventListener('submit', async (e) => {

@@ -1,5 +1,29 @@
 # Legal Consultation & Case Management System
 
+A comprehensive web-based system for managing legal cases, client relationships, and lawyer assignments.
+
+## 🚀 Quick Start with Docker (Recommended)
+
+The easiest way to run the application:
+
+```bash
+# Windows
+start-docker.bat
+
+# Linux/Mac
+chmod +x start-docker.sh
+./start-docker.sh
+```
+
+Then access:
+- **Frontend:** http://localhost:8000
+- **Backend API:** http://localhost:5000/api
+
+See [DOCKER_README.md](DOCKER_README.md) for detailed Docker documentation.
+
+---
+
+## 📋 Features
 A data structures-focused legal case management system demonstrating practical application of Queue, Priority Queue, Stack, and Hash Table in workflow control.
 
 ## 🎯 Project Overview
