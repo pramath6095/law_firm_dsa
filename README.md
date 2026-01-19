@@ -1,173 +1,352 @@
-# Legal Consultation & Case Management System
+# Legal Case Management System
 
-A comprehensive web-based system for managing legal cases, client relationships, and lawyer assignments.
+A comprehensive web-based system for managing legal cases, client relationships, and lawyer assignments with intelligent case prioritization and workflow control.
 
-## 🚀 Quick Start with Docker (Recommended)
+## 🚀 Quick Start
+
+### Option 1: Docker (Recommended)
 
 The easiest way to run the application:
 
 ```bash
-# Windows
-start-docker.bat
+# Start the application
+docker-compose up --build
 
-# Linux/Mac
-chmod +x start-docker.sh
-./start-docker.sh
+# Or run in detached mode (background)
+docker-compose up --build -d
+
+# Stop the application
+docker-compose down
 ```
 
-Then access:
-- **Frontend:** http://localhost:8000
-- **Backend API:** http://localhost:5000/api
+**Access the application:**
+- Frontend: http://localhost:8000
+- Backend API: http://localhost:5000/api
 
-See [DOCKER_README.md](DOCKER_README.md) for detailed Docker documentation.
+### Option 2: Manual Setup (Without Docker)
+
+**Prerequisites:**
+- Python 3.12+
+- Modern web browser
+
+**Steps:**
+
+1. **Install backend dependencies:**
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   ```
+
+2. **Start the backend server:**
+   ```bash
+   python app.py
+   ```
+   Backend will run at `http://localhost:5000`
+
+3. **Serve the frontend:**
+   
+   You need a web server for the frontend. Use one of these:
+   
+   **Option A - Python HTTP Server:**
+   ```bash
+   cd frontend
+   python -m http.server 8000
+   ```
+   
+   **Option B - Node.js http-server:**
+   ```bash
+   npm install -g http-server
+   cd frontend
+   http-server -p 8000
+   ```
+
+4. **Access the application:**
+   - Open http://localhost:8000 in your browser
+
+---
+
+## 🔐 Login & Demo Accounts
+
+### Client Portal
+🔗 **Login URL:** http://localhost:8000/client/login.html
+
+**Sample Client Accounts:**
+| Email | Password | Name |
+|-------|----------|------|
+| `a@gmail.com` | `password123` | John Doe |
+| `b@gmail.com` | `password123` | Jane Smith |
+| `c@gmail.com` | `password123` | Robert Brown |
+| `d@gmail.com` | `password123` | Lisa Anderson |
+| `e@gmail.com` | `password123` | Mark Wilson |
+
+### Lawyer Portal
+🔗 **Login URL:** http://localhost:8000/lawyer/login.html
+
+**Sample Lawyer Accounts:**
+| Email | Password | Name | Speciality | Cost/Hearing |
+|-------|----------|------|------------|--------------|
+| `a@lawfirm.com` | `password123` | Sarah Mitchell | Civil Law, Criminal Law | $5,000 |
+| `b@lawfirm.com` | `password123` | David Chen | Civil Law, Criminal Law | $5,500 |
+| `c@lawfirm.com` | `password123` | Emily Rodriguez | Family Law | $3,500 |
+| `d@lawfirm.com` | `password123` | Michael Johnson | Corporate Law | $4,500 |
+| `e@lawfirm.com` | `password123` | Priya Sharma | Property Law | $6,000 |
 
 ---
 
 ## 📋 Features
-A data structures-focused legal case management system demonstrating practical application of Queue, Priority Queue, Stack, and Hash Table in workflow control.
 
-## 🎯 Project Overview
+### For Clients
+- ✅ Create and track legal cases
+- ✅ Select preferred lawyers by specialization
+- ✅ View case status and updates
+- ✅ Communicate with assigned lawyer
+- ✅ Weekly calendar view of hearings and appointments
+- ✅ Upload case documents
+- ✅ Track case urgency and priority
 
-This system implements a complete legal case management platform with **logic-driven workflow control** using fundamental data structures, rather than typical CRUD operations.
+### For Lawyers
+- ✅ Dashboard with urgent cases highlighted
+- ✅ Manage assigned cases
+- ✅ Update case status with undo functionality
+- ✅ Schedule follow-ups and hearings
+- ✅ Communicate with clients
+- ✅ Weekly calendar with all events
+- ✅ Case status breakdown analytics
+
+---
+
+## 🏗️ Architecture
 
 ### Tech Stack
-- **Backend:** Python 3.x + Flask
+- **Backend:** Python 3.12 + Flask
 - **Frontend:** Vanilla HTML, CSS, JavaScript
-- **Data Storage:** In-memory data structures
-- **Architecture:** RESTful API
+- **Web Server:** Nginx (in Docker)
+- **Data Storage:** In-memory 
 
-## 🚀 Quick Start
 
-### Prerequisites
-- Python 3.7 or higher
-- pip (Python package manager)
+### Data Structures Implementation
 
-### Installation
+This system implements custom data structures from scratch to demonstrate their practical application in legal workflow management.
 
-1. **Install Python dependencies:**
-```bash
-cd backend
-pip install -r requirements.txt
+#### 1. **Queue (FIFO)** - First In, First Out
+
+**Used For:**
+- Normal appointment requests (fair processing)
+- Message ordering (chronological preservation)
+- Notification delivery
+
+**Implementation:**
+```python
+class Queue:
+    def __init__(self):
+        self.items = []
+    
+    def enqueue(self, item):
+        """Add to back"""
+        self.items.append(item)
+    
+    def dequeue(self):
+        """Remove from front"""
+        return self.items.pop(0)
 ```
 
-2. **Start the backend server:**
-```bash
-python app.py
+**Usage Example (Appointment Requests):**
+```python
+class AppointmentManager:
+    def __init__(self):
+        self.normal_queue = Queue()  # FIFO for normal requests
+    
+    def request_appointment(self, case_id, client_id, datetime, is_urgent):
+        if not is_urgent:
+            self.normal_queue.enqueue({
+                'case_id': case_id,
+                'client_id': client_id,
+                'datetime': datetime
+            })
 ```
 
-The server will start at `http://localhost:5000`
+---
 
-3. **Open the frontend:**
-- For clients: Open `frontend/client/login.html` in your browser
-- For lawyers: Open `frontend/lawyer/login.html` in your browser
+#### 2. **Priority Queue** - Priority-Based Processing
 
-### Demo Accounts
+**Used For:**
+- Urgent case handling (cases with hearing ≤ 7 days)
+- Urgent appointment requests
+- Automatic prioritization without manual sorting
 
-**Client:**
-- Email: `client@example.com`
-- Password: `password123`
+**Implementation:**
+```python
+class PriorityQueue:
+    def __init__(self):
+        self.heap = []
+        self.entry_counter = 0
+    
+    def enqueue(self, item, priority):
+        """Priority 1 = urgent, Priority 2 = normal"""
+        entry = (priority, self.entry_counter, item)
+        heapq.heappush(self.heap, entry)
+        self.entry_counter += 1
+    
+    def dequeue(self):
+        """Returns highest priority item first"""
+        priority, counter, item = heapq.heappop(self.heap)
+        return item
+```
 
-**Lawyer:**
-- Email: `lawyer@example.com`
-- Password: `password123`
+**Usage Example (Urgent Cases):**
+```python
+# Cases with hearing within 7 days automatically get urgency_level='urgent'
+if days_until_hearing <= 7:
+    case['urgency_level'] = 'urgent'
+    case['priority_score'] = days_until_hearing  # Lower = more urgent
 
-## 📊 Core Data Structures Used
+# Lawyer dashboard shows urgent cases first
+urgent_cases = [c for c in cases if c['urgency_level'] == 'urgent']
+urgent_cases.sort(key=lambda c: c['priority_score'])  # Sorted by priority
+```
 
-### 1. Queue (FIFO)
-- **Normal appointment requests**: First-come, first-served processing
-- **Messages**: Preserve chronological order
-- **Follow-ups**: Sequential scheduling
-- **Notifications**: Time-ordered display
+---
 
-### 2. Priority Queue
-- **Urgent cases**: Processed before normal cases
-- **Urgent appointments**: Jump ahead in queue
-- **Priority-based workflow**: System decides order, not manual sorting
+#### 3. **Stack (LIFO)** - Last In, First Out
 
-### 3. Stack (LIFO)
-- **Case update undo**: Rollback last status change
-- **State preservation**: Push before update, pop on undo
-- **Legal data safety**: Mistakes can be reversed
+**Used For:**
+- Case status update undo functionality
+- State preservation before updates
 
-### 4. Hash Tables
-- **User lookup**: O(1) email → user data
-- **Case retrieval**: O(1) caseID → case details
-- **Appointments**: O(1) appointmentID → metadata
-- **Documents**: O(1) docID → file information
+**Implementation:**
+```python
+class Stack:
+    def __init__(self):
+        self.items = []
+    
+    def push(self, item):
+        """Add to top"""
+        self.items.append(item)
+    
+    def pop(self):
+        """Remove from top"""
+        return self.items.pop()
+```
 
-## 🔥 Key Differentiators
+**Usage Example (Undo Case Updates):**
+```python
+class CaseManager:
+    def __init__(self):
+        self.case_history_stack = {}  # case_id -> Stack
+    
+    def update_case_status(self, case_id, new_status):
+        case = self.case_store.get_case(case_id)
+        
+        # PUSH current state before update
+        previous_state = {
+            'status': case['status'],
+            'updated_at': case['updated_at']
+        }
+        self.case_history_stack[case_id].push(previous_state)
+        
+        # Apply update
+        case['status'] = new_status
+    
+    def undo_case_update(self, case_id):
+        # POP last state to restore
+        previous = self.case_history_stack[case_id].pop()
+        case = self.case_store.get_case(case_id)
+        case['status'] = previous['status']
+        case['updated_at'] = previous['updated_at']
+```
 
-### 1. Priority Queue Urgency Handling ⚡
-- Urgent cases automatically enter priority queue
-- Algorithmic enforcement, not manual sorting
-- Demonstrates real-world application of priority queues
+---
 
-### 2. Queue-Based Appointment Processing 📅
-- Requests ≠ Confirmations
-- FIFO for normal, priority for urgent
-- Prevents conflicts automatically
+#### 4. **Hash Tables** - O(1) Lookups
 
-### 3. Stack-Based Undo 🔄
-- Rollback case updates safely
-- Direct LIFO application
-- Rare in student projects
+**Used For:**
+- User authentication (email → user data)
+- Case retrieval (case_id → case details)
+- Document access (doc_id → document metadata)
 
-### 4. State Machine Validation ✅
-- Valid transitions: `Created → In Review → Active → Closed`
-- Invalid jumps blocked
-- Workflow correctness enforcement
+**Implementation:**
+```python
+class UserStore:
+    def __init__(self):
+        self.users = {}  # email -> user data (Hash Table)
+        self.users_by_id = {}  # user_id -> user data
+    
+    def get_user_by_email(self, email):
+        """O(1) lookup by email"""
+        return self.users.get(email)
+```
 
-### 5. Case-Scoped Architecture 🔒
-- All messages/documents tied to specific cases
-- No global mixing
-- Clean access control
+**Usage Example (Authentication):**
+```python
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    email = request.json.get('email')
+    password = request.json.get('password')
+    
+    # O(1) hash table lookup instead of O(n) loop
+    user = user_store.get_user_by_email(email)
+    
+    if user and user['password'] == password:
+        session['user_id'] = user['user_id']
+        return jsonify({'message': 'Login successful'})
+```
 
-## 🧪 Testing the Core Logic
+**Case Store Example:**
+```python
+class CaseStore:
+    def __init__(self):
+        self.cases = {}  # case_id -> case_data (Hash Table)
+    
+    def get_case(self, case_id):
+        """O(1) direct access instead of searching array"""
+        return self.cases.get(case_id)
+    
+    def get_cases_by_lawyer(self, lawyer_id):
+        """Filter from hash table values"""
+        return [case for case in self.cases.values() 
+                if case['lawyer_id'] == lawyer_id]
+```
 
-### 1. Test FIFO Queue Behavior
-1. Login as client
-2. Create 3 normal cases
-3. Request appointments for all
-4. Login as lawyer
-5. Check consultation requests - should be in request order
+---
 
-### 2. Test Priority Queue
-1. Create an urgent case (check the "urgent" box)
-2. Request appointment
-3. Lawyer should see urgent request first, regardless of creation order
+### Why These Data Structures?
 
-### 3. Test Stack Undo
-1. Login as lawyer
-2. Update a case status
-3. Click "Undo Last Update"
-4. Verify status reverted to previous state
+| Data Structure | Why Chosen | Real-World Benefit |
+|---------------|------------|-------------------|
+| **Queue** | Appointment requests need fair FIFO processing | First-come, first-served fairness |
+| **Priority Queue** | Urgent cases need automatic prioritization | System enforces urgency, not manual sorting |
+| **Stack** | Legal data is sensitive - mistakes need reversibility | One-click undo for case updates |
+| **Hash Tables** | Fast lookups critical for authentication & case access | O(1) instead of O(n) - instant retrieval |
 
-### 4. Test State Validation
-1. Try invalid transition (e.g., Created → Closed)
-2. System should reject and show error
+---
 
-### 5. Test Case Ownership
-1. Try accessing another user's case URL
-2. Should be blocked with "Unauthorized"
+### Core Logic Components
+1. Case ownership & access control
+2. Intelligent lawyer assignment with auto-fallback
+3. Urgency-based case prioritization
+4. Case state validation (Created → In Review → Active → Closed)
+5. Appointment conflict detection
+6. Case-bound messaging system
+7. Document management with access control
+8. Follow-up scheduling
+9. Notification system
+10. Weekly calendar event management
 
-### 6. Test Appointment Conflict
-1. Approve an appointment for specific time
-2. Try approving another for same time
-3. Should reject with conflict message
+---
 
 ## 📁 Project Structure
 
 ```
-dsael/
+law/
 ├── backend/
-│   ├── data_structures.py    # Custom Queue, PriorityQueue, Stack, Hash Tables
-│   ├── core_logic.py          # 10 core logic implementations
 │   ├── app.py                 # Flask API server
+│   ├── core_logic.py          # Business logic & managers
+│   ├── data_structures.py     # Custom data structures
 │   └── requirements.txt
 ├── frontend/
-│   ├── app.js                 # Shared utilities
+│   ├── app.js                 # Shared utilities & API client
 │   ├── styles.css             # Global styles
-│   ├── client/                # Client interface
+│   ├── client/                # Client portal pages
 │   │   ├── login.html
 │   │   ├── signup.html
 │   │   ├── dashboard.html
@@ -175,89 +354,116 @@ dsael/
 │   │   ├── create-case.html
 │   │   ├── case-details.html
 │   │   └── profile.html
-│   └── lawyer/                # Lawyer interface
+│   └── lawyer/                # Lawyer portal pages
 │       ├── login.html
 │       ├── dashboard.html
-│       ├── consultation-requests.html
 │       ├── cases.html
 │       ├── case-details.html
 │       └── profile.html
+├── docker-compose.yml
+├── Dockerfile.backend
+├── Dockerfile.frontend
+├── nginx.conf
 └── README.md
 ```
 
-## 🎓 Data Structures Justification
+---
 
-### Why Queue?
-- Appointment requests need fair FIFO processing
-- Messages must preserve order
-- Follow-ups scheduled chronologically
+## 🧪 Testing the System
 
-### Why Priority Queue?
-- Urgent cases need immediate attention
-- System should automatically prioritize, not rely on manual sorting
-- Real-world legal workflows have urgency levels
+### 1. Test as Client
+1. Login at http://localhost:8000/client/login.html with `a@gmail.com` / `password123`
+2. Create a new case from the dashboard
+3. Select a lawyer and enter case details (minimum 50 words required)
+4. View your case on the dashboard and calendar
+5. Check case details and send messages to your lawyer
 
-### Why Stack?
-- Legal data is sensitive - mistakes need reversibility
-- Undo functionality requires LIFO behavior
-- State preservation before updates
+### 2. Test as Lawyer
+1. Login at http://localhost:8000/lawyer/login.html with `a@lawfirm.com` / `password123`
+2. View assigned cases on the dashboard
+3. Click on a case to view details
+4. Update case status
+5. Schedule follow-ups and hearings
+6. Send messages to clients
+7. Test the undo functionality for case updates
 
-### Why Hash Tables?
-- O(1) lookups critical for performance
-- User authentication requires fast email lookup
-- Case access by ID must be instant
-
-## 🔧 Analytics Endpoints
-
-### Queue Statistics
-- Endpoint: `/api/analytics/queue-stats`
-- Shows: Normal queue length, urgent queue length, total pending
-
-### Urgency Distribution
-- Endpoint: `/api/analytics/urgency-distribution`
-- Shows: % urgent vs normal cases, validates priority queue logic
-
-## 🎯 10 Core Logic Components
-
-1. ✅ Case Ownership & Access Control
-2. ✅ Appointment Request Handling (Queue + Priority Queue)
-3. ✅ Appointment Conflict Detection
-4. ✅ Urgency-Based Case Handling
-5. ✅ Case Update with Undo (Stack)
-6. ✅ Case State Validation
-7. ✅ Case-Bound Messaging
-8. ✅ Document Access Control
-9. ✅ Follow-Up Scheduling
-10. ✅ Notification System
-
-## 🚧 Known Limitations
-
-- In-memory storage (data lost on restart)
-- Passwords not hashed (demo only)
-- File uploads simulated (no actual file storage)
-- Single server instance (no scalability)
-
-These are intentional for academic demonstration of data structures, not production deployment.
-
-## 📝 Future Enhancements
-
-- Database persistence (SQLite/PostgreSQL)
-- Real file upload with storage
-- Password hashing (bcrypt)
-- Admin dashboard
-- Email notifications
-- Calendar integration
-
-## 🎓 Academic Value
-
-This project demonstrates:
-- Practical application of 4 core data structures
-- Logic-driven workflow vs. simple CRUD
-- State management
-- Access control
-- Workflow validation
-- Real-world problem solving with DSA
+### 3. Test Priority Queue
+1. Create an urgent case (hearing date within 7 days)
+2. Login as lawyer to see it appear in "Urgent Cases" section
+3. Verify urgent cases are prioritized in the dashboard
 
 ---
 
-**Built for demonstrating practical data structure applications in legal case management.**
+## 🔧 API Endpoints
+
+### Authentication
+- `POST /api/auth/login` - User login
+- `POST /api/auth/signup` - Client registration
+- `POST /api/auth/logout` - Logout
+- `GET /api/auth/me` - Get current user
+
+### Client Endpoints
+- `GET /api/client/dashboard` - Dashboard data
+- `GET /api/client/cases` - Get all client cases
+- `POST /api/client/cases` - Create new case
+- `GET /api/client/cases/:id` - Get case details
+
+### Lawyer Endpoints
+- `GET /api/lawyer/dashboard` - Dashboard data with urgent cases
+- `GET /api/lawyer/cases` - Get assigned cases
+- `GET /api/lawyer/cases/:id` - Get case details
+- `POST /api/lawyer/cases/:id/update` - Update case status
+- `POST /api/lawyer/cases/:id/undo` - Undo last update
+- `POST /api/lawyer/cases/:id/followups` - Schedule follow-up
+
+### Shared
+- `GET /api/calendar/week` - Weekly calendar events
+- `GET /api/lawyers` - List all lawyers with specializations
+
+---
+
+## 🐳 Docker Configuration
+
+The application uses Docker Compose with two services:
+
+- **Backend:** Flask app running on port 5000
+- **Frontend:** Nginx serving static files on port 8000 with reverse proxy to backend
+
+Nginx proxies `/api/*` requests to the backend, making all requests same-origin and eliminating CORS issues.
+
+---
+
+## ⚠️ Important Notes
+
+### For Development/Demo Purposes Only
+- **In-memory storage:** All data is lost when the server restarts
+- **No password hashing:** Passwords stored in plain text
+- **No file uploads:** Document uploads are simulated
+- **Session-based auth:** Uses Flask sessions (not production-ready)
+
+### Not Production Ready
+This is a demonstrative application for learning purposes. For production:
+- Implement database persistence (PostgreSQL/MySQL)
+- Add password hashing (bcrypt)
+- Implement JWT authentication
+- Add proper file storage (S3/local storage)
+- Add input validation and sanitization
+- Implement rate limiting
+- Add HTTPS/SSL
+- Add logging and monitoring
+
+---
+
+## 🤝 Contributing
+
+This is an educational project demonstrating legal case management with data structures and algorithms.
+
+---
+
+## 📄 License
+
+MIT License - Free to use for educational purposes.
+
+---
+
+**Built with Flask, Vanilla JavaScript, and Docker** 🚀
