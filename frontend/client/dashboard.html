@@ -225,11 +225,11 @@
         <!-- Weekly Calendar -->
         <div class="card">
             <h2>This Week's Schedule</h2>
-            <p class="text-muted" style="margin-bottom: 20px;">Events sorted by priority (most urgent first)</p>
+            <p class="text-muted" style="margin-bottom: 20px;">Weekly calendar view (Monday - Sunday)</p>
 
-            <div class="week-navigation">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <button class="btn btn-secondary" onclick="changeWeek(-1)">← Previous Week</button>
-                <div class="week-range" id="week-range">Loading...</div>
+                <div style="font-size: 18px; font-weight: 600;" id="week-range">Loading...</div>
                 <button class="btn btn-secondary" onclick="changeWeek(1)">Next Week →</button>
             </div>
 
@@ -303,16 +303,6 @@
                     document.getElementById('next-event-badge').textContent = urgencyBadge;
                     document.getElementById('next-event-banner').style.display = 'block';
                 }
-            }
-
-            if (events.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-calendar">
-                        <p style="font-size: 18px;">📅 No events scheduled this week</p>
-                        <p>Your calendar is clear!</p>
-                    </div>
-                `;
-                return;
             }
 
             // Create day columns for the week (Monday - Sunday)
