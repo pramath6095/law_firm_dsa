@@ -6,6 +6,72 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profile - Legal Case Management</title>
     <link rel="stylesheet" href="../styles.css">
+    <style>
+        .profile-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .profile-field {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: var(--bg-light);
+            border-radius: 8px;
+        }
+
+        .profile-field label {
+            display: block;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+
+        .profile-field .value {
+            color: var(--text-gray);
+            font-size: 16px;
+        }
+
+        .profile-field input,
+        .profile-field select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        .speciality-checkboxes {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .speciality-checkboxes label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: normal;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        #edit-mode {
+            display: none;
+        }
+
+        .readonly-badge {
+            background: #e0e0e0;
+            color: #666;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            display: inline-block;
+        }
+    </style>
 </head>
 
 <body>
@@ -22,10 +88,57 @@
     </div>
 
     <div class="container">
-        <div class="card">
-            <h2>My Profile</h2>
-            <div id="profile-info">
-                <p class="loading">Loading...</p>
+        <div class="card profile-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                <h2>My Profile</h2>
+                <button id="edit-btn" class="btn btn-primary" onclick="enableEdit()">Edit Profile</button>
+            </div>
+
+            <!-- View Mode -->
+            <div id="view-mode">
+                <div id="profile-view"></div>
+            </div>
+
+            <!-- Edit Mode -->
+            <div id="edit-mode">
+                <div class="profile-field">
+                    <label for="edit-name">Name</label>
+                    <input type="text" id="edit-name" required>
+                </div>
+
+                <div class="profile-field">
+                    <label>Email <span class="readonly-badge">Read-only</span></label>
+                    <div class="value" id="view-email"></div>
+                </div>
+
+                <div class="profile-field">
+                    <label for="edit-phone">Phone</label>
+                    <input type="tel" id="edit-phone" required>
+                </div>
+
+                <div class="profile-field">
+                    <label>Specialities</label>
+                    <div class="speciality-checkboxes">
+                        <label><input type="checkbox" value="Civil Law" class="speciality-checkbox"> Civil Law</label>
+                        <label><input type="checkbox" value="Criminal Law" class="speciality-checkbox"> Criminal
+                            Law</label>
+                        <label><input type="checkbox" value="Family Law" class="speciality-checkbox"> Family Law</label>
+                        <label><input type="checkbox" value="Corporate Law" class="speciality-checkbox"> Corporate
+                            Law</label>
+                        <label><input type="checkbox" value="Property Law" class="speciality-checkbox"> Property
+                            Law</label>
+                    </div>
+                </div>
+
+                <div class="profile-field">
+                    <label>Cost per Hearing <span class="readonly-badge">Admin only</span></label>
+                    <div class="value" id="view-cost"></div>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="saveProfile()">Save Changes</button>
+                    <button class="btn btn-secondary" onclick="cancelEdit()">Cancel</button>
+                </div>
             </div>
         </div>
     </div>
@@ -36,14 +149,130 @@
             // Redirected
         }
 
-        const user = Session.getUser();
+        let profileData = null;
 
-        document.getElementById('profile-info').innerHTML = `
-            <p><strong>Name:</strong> ${user.name}</p>
-            <p><strong>Email:</strong> ${user.email}</p>
-            <p><strong>User ID:</strong> ${user.user_id}</p>
-            <p><strong>Role:</strong> ${user.role}</p>
-        `;
+        async function loadProfile() {
+            try {
+                const response = await fetch(`${API_URL}/api/profile`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) throw new Error('Failed to load profile');
+
+                profileData = await response.json();
+                displayProfile();
+            } catch (error) {
+                console.error('Error loading profile:', error);
+                showAlert('Error loading profile', 'error');
+            }
+        }
+
+        function displayProfile() {
+            const specialityList = profileData.speciality && profileData.speciality.length > 0
+                ? profileData.speciality.join(', ')
+                : 'Not specified';
+
+            document.getElementById('profile-view').innerHTML = `
+                <div class="profile-field">
+                    <label>Name</label>
+                    <div class="value">${profileData.name}</div>
+                </div>
+                <div class="profile-field">
+                    <label>Email</label>
+                    <div class="value">${profileData.email}</div>
+                </div>
+                <div class="profile-field">
+                    <label>Phone</label>
+                    <div class="value">${profileData.phone || 'Not provided'}</div>
+                </div>
+                <div class="profile-field">
+                    <label>Specialities</label>
+                    <div class="value">${specialityList}</div>
+                </div>
+                <div class="profile-field">
+                    <label>Cost per Hearing</label>
+                    <div class="value">$${(profileData.cost_per_hearing || 0).toLocaleString()}</div>
+                </div>
+                <div class="profile-field">
+                    <label>Role</label>
+                    <div class="value">${profileData.role}</div>
+                </div>
+            `;
+        }
+
+        function enableEdit() {
+            // Populate edit fields
+            document.getElementById('edit-name').value = profileData.name;
+            document.getElementById('edit-phone').value = profileData.phone || '';
+            document.getElementById('view-email').textContent = profileData.email;
+            document.getElementById('view-cost').textContent = `$${(profileData.cost_per_hearing || 0).toLocaleString()}`;
+
+            // Set speciality checkboxes
+            const checkboxes = document.querySelectorAll('.speciality-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = profileData.speciality && profileData.speciality.includes(cb.value);
+            });
+
+            // Toggle modes
+            document.getElementById('view-mode').style.display = 'none';
+            document.getElementById('edit-mode').style.display = 'block';
+            document.getElementById('edit-btn').style.display = 'none';
+        }
+
+        function cancelEdit() {
+            document.getElementById('view-mode').style.display = 'block';
+            document.getElementById('edit-mode').style.display = 'none';
+            document.getElementById('edit-btn').style.display = 'block';
+        }
+
+        async function saveProfile() {
+            const name = document.getElementById('edit-name').value.trim();
+            const phone = document.getElementById('edit-phone').value.trim();
+
+            if (!name || name.length < 2) {
+                showAlert('Name must be at least 2 characters', 'error');
+                return;
+            }
+
+            if (!phone) {
+                showAlert('Phone number is required', 'error');
+                return;
+            }
+
+            // Get selected specialities
+            const checkboxes = document.querySelectorAll('.speciality-checkbox:checked');
+            const speciality = Array.from(checkboxes).map(cb => cb.value);
+
+            try {
+                const response = await fetch(`${API_URL}/api/profile`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ name, phone, speciality })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showAlert(data.error || 'Failed to update profile', 'error');
+                    return;
+                }
+
+                showAlert('Profile updated successfully!', 'success');
+
+                // Update session
+                Session.updateUser({ name, email: profileData.email });
+
+                // Reload profile
+                await loadProfile();
+                cancelEdit();
+            } catch (error) {
+                console.error('Error saving profile:', error);
+                showAlert('Error saving profile', 'error');
+            }
+        }
+
+        loadProfile();
     </script>
 </body>
 

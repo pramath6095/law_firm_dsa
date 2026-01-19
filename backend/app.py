@@ -259,6 +259,70 @@ def get_current_user():
     })
 
 
+@app.route('/api/profile', methods=['GET', 'PUT'])
+@login_required
+def profile():
+    """Get or update user profile"""
+    user_id = session['user_id']
+    user = user_store.get_user_by_id(user_id)
+    
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    
+    if request.method == 'GET':
+        # Return full profile
+        profile_data = {
+            'user_id': user['user_id'],
+            'name': user['name'],
+            'email': user['email'],
+            'phone': user.get('phone', ''),
+            'role': user['role']
+        }
+        
+        # Add lawyer-specific fields
+        if user['role'] == 'lawyer':
+            profile_data['speciality'] = user.get('speciality', [])
+            profile_data['cost_per_hearing'] = user.get('cost_per_hearing', 0)
+        
+        return jsonify(profile_data)
+    
+    elif request.method == 'PUT':
+        # Update profile - modifies dictionary directly
+        data = request.json
+        
+        # Validation
+        name = data.get('name', '').strip()
+        phone = data.get('phone', '').strip()
+        
+        if not name or len(name) < 2:
+            return jsonify({'error': 'Name must be at least 2 characters'}), 400
+        
+        if not phone:
+            return jsonify({'error': 'Phone number is required'}), 400
+        
+        # Update the dictionary directly!
+        user['name'] = name
+        user['phone'] = phone
+        
+        # Update speciality for lawyers
+        if user['role'] == 'lawyer' and 'speciality' in data:
+            speciality = data.get('speciality')
+            if isinstance(speciality, list):
+                user['speciality'] = speciality
+        
+        return jsonify({
+            'message': 'Profile updated successfully',
+            'user': {
+                'user_id': user['user_id'],
+                'name': user['name'],
+                'email': user['email'],
+                'phone': user['phone'],
+                'role': user['role']
+            }
+        })
+
+
+
 # ============================================================================
 # CLIENT ENDPOINTS
 # ============================================================================

@@ -776,7 +776,8 @@ class EventManager:
         # Convert to days since Sunday: (weekday + 1) % 7
         days_since_sunday = (start_date.weekday() + 1) % 7
         week_start = start_date - timedelta(days=days_since_sunday)
-        week_end = week_start + timedelta(days=6)  # Sunday + 6 days = Saturday
+        # Add 6 full days (6 days, 23 hours, 59 minutes) to include all of Saturday
+        week_end = week_start + timedelta(days=6, hours=23, minutes=59, seconds=59)
         
         if role == 'client':
             cases = self.case_store.get_cases_by_client(user_id)
