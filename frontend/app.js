@@ -120,13 +120,6 @@ class API {
         return await this.request(`/client/cases/${caseId}`);
     }
 
-    static async requestAppointment(caseId, preferredDatetime) {
-        return await this.request(`/client/cases/${caseId}/appointments`, {
-            method: 'POST',
-            body: { preferred_datetime: preferredDatetime }
-        });
-    }
-
     static async getCaseMessages(caseId) {
         return await this.request(`/client/cases/${caseId}/messages`);
     }
@@ -152,31 +145,6 @@ class API {
     // Lawyer endpoints
     static async getLawyerDashboard() {
         return await this.request('/lawyer/dashboard');
-    }
-
-    static async getConsultationRequests() {
-        return await this.request('/lawyer/consultation-requests');
-    }
-
-    static async approveAppointment(appointmentId, confirmedDatetime) {
-        return await this.request(`/lawyer/appointments/${appointmentId}/approve`, {
-            method: 'POST',
-            body: { confirmed_datetime: confirmedDatetime }
-        });
-    }
-
-    static async rejectAppointment(appointmentId, reason) {
-        return await this.request(`/lawyer/appointments/${appointmentId}/reject`, {
-            method: 'POST',
-            body: { reason }
-        });
-    }
-
-    static async rescheduleAppointment(appointmentId, newDatetime) {
-        return await this.request(`/lawyer/appointments/${appointmentId}/reschedule`, {
-            method: 'POST',
-            body: { new_datetime: newDatetime }
-        });
     }
 
     static async getLawyerCases() {

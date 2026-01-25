@@ -14,7 +14,7 @@
 
 ## Project Overview
 
-This project is a **Legal Case Management System** that demonstrates the practical application of fundamental data structures in a real-world workflow management scenario. The system manages legal cases, client-lawyer relationships, appointments, and notifications using custom implementations of **Queues**, **Priority Queues**, **Stacks**, and **Hash Tables**.
+This project is a **Legal Case Management System** that demonstrates the practical application of fundamental data structures in a real-world workflow management scenario. The system manages legal cases, client-lawyer relationships, and notifications using custom implementations of **Queues**, **Priority Queues**, **Stacks**, and **Hash Tables**.
 
 ### Tech Stack
 | Component | Technology |
@@ -47,7 +47,6 @@ class Queue:
 **Use Cases in the Project:**
 | Feature | Why Queue? |
 |---------|-----------|
-| Normal Appointment Requests | First-come, first-served processing |
 | Case Messages | Preserve chronological order |
 | Follow-up Scheduling | Sequential scheduling |
 | Notifications | Time-ordered display |
@@ -81,7 +80,6 @@ class PriorityQueue:
 | Feature | Why Priority Queue? |
 |---------|-------------------|
 | Urgent Case Handling | Urgent cases processed before normal |
-| Urgent Appointments | Jump ahead in queue |
 | Available Cases Pool | Lawyers see urgent cases first |
 
 **Implementation Details:**
@@ -175,27 +173,14 @@ class DocumentStore:
 - Lawyers can only access assigned cases
 - Role-based authorization at API level
 
-### 2. Appointment Request Handling
-```
-Client Request → Queue (Normal) OR Priority Queue (Urgent) → Lawyer Processing
-```
-- Normal requests go to FIFO Queue
-- Urgent requests go to Priority Queue
-- Lawyers always see urgent requests first
-
-### 3. Appointment Conflict Detection
-- 60-minute buffer between appointments
-- Automatic conflict checking before approval
-- Prevents double-booking
-
-### 4. Urgency-Based Case Handling
+### 2. Urgency-Based Case Handling
 | Days Until Hearing | Urgency Level | Priority Score |
 |-------------------|---------------|----------------|
 | ≤ 7 days | Urgent | 0-7 |
 | 8-14 days | High | 8-14 |
 | > 14 days | Normal | 15+ |
 
-### 5. Case Update with Undo (Stack-Based)
+### 3. Case Update with Undo (Stack-Based)
 ```python
 # Before update: Push current state to stack
 previous_state = {status, updates, updated_at}
@@ -375,7 +360,6 @@ chmod +x start-docker.sh
 | GET | `/api/client/cases` | Get all client's cases |
 | POST | `/api/client/cases` | Create a new case |
 | GET | `/api/client/cases/<case_id>` | Get specific case details |
-| POST | `/api/client/cases/<case_id>/appointments` | Request appointment |
 | GET/POST | `/api/client/cases/<case_id>/messages` | Get or send messages |
 | GET/POST | `/api/client/cases/<case_id>/documents` | Get or upload documents |
 
@@ -396,11 +380,7 @@ chmod +x start-docker.sh
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/lawyer/dashboard` | Get dashboard (urgent cases, pending requests) |
-| GET | `/api/lawyer/consultation-requests` | Get pending appointment requests |
-| POST | `/api/lawyer/appointments/<id>/approve` | Approve appointment |
-| POST | `/api/lawyer/appointments/<id>/reject` | Reject appointment |
-| POST | `/api/lawyer/appointments/<id>/reschedule` | Reschedule appointment |
+| GET | `/api/lawyer/dashboard` | Get dashboard (urgent cases) |
 | GET | `/api/lawyer/cases` | Get all assigned cases |
 | GET | `/api/lawyer/cases/<case_id>` | Get case details |
 | POST | `/api/lawyer/cases/<case_id>/update` | Update case status |
@@ -464,11 +444,11 @@ chmod +x start-docker.sh
 
 ```
 1. Login as client (a@gmail.com / password123)
-2. Create 3 cases with different timestamps
-3. Request appointments for all 3
+2. Create a case and go to case details
+3. Send multiple messages to your lawyer
 4. Login as lawyer (a@lawfirm.com / password123)
-5. Check consultation requests
-✓ Verify: Requests appear in creation order (FIFO)
+5. Check the messages in the case
+✓ Verify: Messages appear in chronological order (FIFO)
 ```
 
 ### 2. Test Priority Queue
@@ -541,9 +521,6 @@ chmod +x start-docker.sh
 | | check_access | O(1) | Hash Table |
 | | update_case_status | O(1) | Hash Table + Stack |
 | | undo_last_update | O(1) | Stack |
-| AppointmentManager | request_appointment | O(1)/O(log n) | Queue/Priority Queue |
-| | get_next_request | O(1)/O(log n) | Queue/Priority Queue |
-| | check_conflict | O(m) | Linear search (m = appointments) |
 | MessageManager | send_message | O(1) | Queue |
 | | get_messages | O(n) | Queue (copy all) |
 | NotificationManager | add_notification | O(1) | Queue |
@@ -574,8 +551,8 @@ This project demonstrates practical application of:
 law/
 ├── backend/
 │   ├── data_structures.py    # ← Custom Queue, PriorityQueue, Stack, Hash Tables
-│   ├── core_logic.py         # ← 10 core logic implementations using DS
-│   ├── app.py                # ← Flask API server (51 endpoints)
+│   ├── core_logic.py         # ← 8 core logic implementations using DS
+│   ├── app.py                # ← Flask API server
 │   └── requirements.txt
 ├── frontend/
 │   ├── app.js                # Shared utilities
@@ -588,13 +565,12 @@ law/
 │   │   ├── create-case.html
 │   │   ├── case-details.html
 │   │   └── profile.html
-│   └── lawyer/               # Lawyer interface (6 pages)
+│   └── lawyer/               # Lawyer interface (5 pages)
 │       ├── login.html
 │       ├── dashboard.html
 │       ├── cases.html
 │       ├── case-details.html
-│       ├── profile.html
-│       └── calendar-grid.js
+│       └── profile.html
 ├── Dockerfile.backend
 ├── Dockerfile.frontend
 ├── docker-compose.yml

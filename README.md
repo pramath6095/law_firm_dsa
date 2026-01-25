@@ -131,9 +131,9 @@ This system implements custom data structures from scratch to demonstrate their 
 #### 1. **Queue (FIFO)** - First In, First Out
 
 **Used For:**
-- Normal appointment requests (fair processing)
 - Message ordering (chronological preservation)
 - Notification delivery
+- Follow-up scheduling
 
 **Implementation:**
 ```python
@@ -150,19 +150,21 @@ class Queue:
         return self.items.pop(0)
 ```
 
-**Usage Example (Appointment Requests):**
+**Usage Example (Messages):**
 ```python
-class AppointmentManager:
+class MessageManager:
     def __init__(self):
-        self.normal_queue = Queue()  # FIFO for normal requests
+        self.case_messages = {}  # case_id -> Queue of messages
     
-    def request_appointment(self, case_id, client_id, datetime, is_urgent):
-        if not is_urgent:
-            self.normal_queue.enqueue({
-                'case_id': case_id,
-                'client_id': client_id,
-                'datetime': datetime
-            })
+    def send_message(self, case_id, sender_id, content):
+        if case_id not in self.case_messages:
+            self.case_messages[case_id] = Queue()
+        
+        self.case_messages[case_id].enqueue({
+            'sender_id': sender_id,
+            'content': content,
+            'timestamp': datetime.now()
+        })
 ```
 
 ---
@@ -171,8 +173,8 @@ class AppointmentManager:
 
 **Used For:**
 - Urgent case handling (cases with hearing ≤ 7 days)
-- Urgent appointment requests
 - Automatic prioritization without manual sorting
+- Available cases pool (lawyers see urgent cases first)
 
 **Implementation:**
 ```python
@@ -313,7 +315,7 @@ class CaseStore:
 
 | Data Structure | Why Chosen | Real-World Benefit |
 |---------------|------------|-------------------|
-| **Queue** | Appointment requests need fair FIFO processing | First-come, first-served fairness |
+| **Queue** | Messages and notifications need FIFO processing | Chronological order preserved |
 | **Priority Queue** | Urgent cases need automatic prioritization | System enforces urgency, not manual sorting |
 | **Stack** | Legal data is sensitive - mistakes need reversibility | One-click undo for case updates |
 | **Hash Tables** | Fast lookups critical for authentication & case access | O(1) instead of O(n) - instant retrieval |
@@ -325,12 +327,11 @@ class CaseStore:
 2. Intelligent lawyer assignment with auto-fallback
 3. Urgency-based case prioritization
 4. Case state validation (Created → In Review → Active → Closed)
-5. Appointment conflict detection
-6. Case-bound messaging system
-7. Document management with access control
-8. Follow-up scheduling
-9. Notification system
-10. Weekly calendar event management
+5. Case-bound messaging system
+6. Document management with access control
+7. Follow-up scheduling
+8. Notification system
+9. Weekly calendar event management
 
 ---
 

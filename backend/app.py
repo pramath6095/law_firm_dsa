@@ -13,7 +13,7 @@ import os
 
 from data_structures import CaseStore, UserStore, DocumentStore
 from core_logic import (
-    CaseManager, AppointmentManager, MessageManager,
+    CaseManager, MessageManager,
     DocumentManager, FollowUpManager, NotificationManager,
     EventManager
 )
@@ -40,7 +40,6 @@ document_store = DocumentStore()
 
 # Initialize managers
 case_manager = CaseManager(case_store)
-appointment_manager = AppointmentManager()
 message_manager = MessageManager()
 document_manager = DocumentManager(document_store, case_store)
 followup_manager = FollowUpManager()
@@ -360,7 +359,7 @@ def client_dashboard():
 @app.route('/api/lawyers', methods=['GET'])
 def get_lawyers():
     """Get all lawyers with their specialities and costs"""
-    all_lawyers = [u for u in user_store.users.values() if u.get('role') == 'lawyer']
+    all_lawyers = [u for u in user_store.get_all_users() if u.get('role') == 'lawyer']
     
     # Add active case count for each lawyer
     lawyers_with_counts = []
@@ -387,6 +386,26 @@ def client_cases():
     
     if request.method == 'GET':
         cases = case_store.get_cases_by_client(client_id)
+        
+        # PURE DSA: Manual bubble sort by priority_score (lower = more urgent)
+        # No built-in sort() used - manual comparison and swapping
+        n = 0
+        for _ in cases:
+            n = n + 1
+        
+        # Bubble sort: compare adjacent elements and swap if needed
+        for i in range(n):
+            for j in range(0, n - i - 1):
+                # Get priority scores (days until hearing)
+                score_j = cases[j].get('priority_score', 999)
+                score_j1 = cases[j + 1].get('priority_score', 999)
+                
+                # If current case is less urgent than next, swap
+                if score_j > score_j1:
+                    temp = cases[j]
+                    cases[j] = cases[j + 1]
+                    cases[j + 1] = temp
+        
         return jsonify({'cases': cases})
     
     elif request.method == 'POST':
@@ -490,47 +509,6 @@ def get_case_details(case_id):
     })
 
 
-@app.route('/api/client/cases/<case_id>/appointments', methods=['POST'])
-@login_required
-@role_required('client')
-def request_appointment(case_id):
-    """Request appointment for case"""
-    client_id = session['user_id']
-    
-    # Check access
-    if not case_manager.check_access(case_id, client_id, 'client'):
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    data = request.json
-    preferred_datetime = data.get('preferred_datetime')
-    
-    if not preferred_datetime:
-        return jsonify({'error': 'Preferred datetime required'}), 400
-    
-    # Get case to check urgency
-    case = case_store.get_case(case_id)
-    urgency = case.get('urgency', False)
-    
-    # Create appointment request
-    appointment = appointment_manager.request_appointment(
-        case_id, client_id, preferred_datetime, urgency
-    )
-    
-    # Notify lawyer
-    lawyer_id = case.get('lawyer_id')
-    if lawyer_id:
-        notification_manager.add_notification(
-            lawyer_id,
-            'appointment_request',
-            f'New appointment request for case {case_id}',
-            appointment['appointment_id']
-        )
-    
-    return jsonify({
-        'message': 'Appointment requested',
-        'appointment': appointment
-    }), 201
-
 
 @app.route('/api/client/cases/<case_id>/messages', methods=['GET', 'POST'])
 @login_required
@@ -631,9 +609,6 @@ def lawyer_dashboard():
     # Get urgent cases (for display) - cases with hearing ≤7 days
     urgent_cases = [c for c in cases_with_hearings if c.get('urgency_level') == 'urgent']
     
-    # Get pending appointment requests
-    pending_requests = appointment_manager.get_pending_requests()
-    
     # Get notifications
     notifications = notification_manager.get_notifications(lawyer_id)
     unread_count = notification_manager.get_unread_count(lawyer_id)
@@ -641,104 +616,10 @@ def lawyer_dashboard():
     return jsonify({
         'total_cases': len(cases),
         'urgent_cases_count': len(urgent_cases),
-        'pending_requests_count': len(pending_requests),
         'unread_notifications': unread_count,
         'urgent_cases': urgent_cases[:5]  # Top 5 most urgent
     })
 
-
-@app.route('/api/lawyer/consultation-requests', methods=['GET'])
-@login_required
-@role_required('lawyer')
-def consultation_requests():
-    """Get pending consultation requests"""
-    pending = appointment_manager.get_pending_requests()
-    return jsonify({'requests': pending})
-
-
-@app.route('/api/lawyer/appointments/<appointment_id>/approve', methods=['POST'])
-@login_required
-@role_required('lawyer')
-def approve_appointment(appointment_id):
-    """Approve appointment request"""
-    lawyer_id = session['user_id']
-    data = request.json
-    
-    confirmed_datetime = data.get('confirmed_datetime')
-    if not confirmed_datetime:
-        return jsonify({'error': 'Confirmed datetime required'}), 400
-    
-    success, message = appointment_manager.approve_appointment(
-        appointment_id, lawyer_id, confirmed_datetime
-    )
-    
-    if not success:
-        return jsonify({'error': message}), 400
-    
-    # Notify client
-    appointment = appointment_manager.appointments.get(appointment_id)
-    if appointment:
-        notification_manager.add_notification(
-            appointment['client_id'],
-            'appointment_approved',
-            f'Your appointment has been approved for {confirmed_datetime}',
-            appointment_id
-        )
-    
-    return jsonify({'message': message})
-
-
-@app.route('/api/lawyer/appointments/<appointment_id>/reject', methods=['POST'])
-@login_required
-@role_required('lawyer')
-def reject_appointment(appointment_id):
-    """Reject appointment request"""
-    data = request.json
-    reason = data.get('reason', 'No reason provided')
-    
-    success = appointment_manager.reject_appointment(appointment_id, reason)
-    if not success:
-        return jsonify({'error': 'Appointment not found'}), 404
-    
-    # Notify client
-    appointment = appointment_manager.appointments.get(appointment_id)
-    if appointment:
-        notification_manager.add_notification(
-            appointment['client_id'],
-            'appointment_rejected',
-            f'Your appointment was rejected: {reason}',
-            appointment_id
-        )
-    
-    return jsonify({'message': 'Appointment rejected'})
-
-
-@app.route('/api/lawyer/appointments/<appointment_id>/reschedule', methods=['POST'])
-@login_required
-@role_required('lawyer')
-def reschedule_appointment(appointment_id):
-    """Reschedule appointment"""
-    data = request.json
-    new_datetime = data.get('new_datetime')
-    
-    if not new_datetime:
-        return jsonify({'error': 'New datetime required'}), 400
-    
-    success = appointment_manager.reschedule_appointment(appointment_id, new_datetime)
-    if not success:
-        return jsonify({'error': 'Appointment not found'}), 404
-    
-    # Notify client
-    appointment = appointment_manager.appointments.get(appointment_id)
-    if appointment:
-        notification_manager.add_notification(
-            appointment['client_id'],
-            'appointment_rescheduled',
-            f'Your appointment has been rescheduled to {new_datetime}',
-            appointment_id
-        )
-    
-    return jsonify({'message': 'Appointment rescheduled'})
 
 
 @app.route('/api/lawyer/cases', methods=['GET'])
@@ -1080,7 +961,7 @@ def reject_direct_request(case_id):
 @login_required
 def get_all_lawyers():
     """Get list of all lawyers for selection"""
-    all_users = list(user_store.users.values())
+    all_users = user_store.get_all_users()
     lawyers = [
         {
             'user_id': u['user_id'],

@@ -1,17 +1,15 @@
 """
 Core Logic Layer for Legal Case Management System
 
-Implements the 10 critical logic components using data structures:
+Implements critical logic components using data structures:
 1. Case Ownership & Access Control
-2. Appointment Request Handling
-3. Appointment Conflict Detection
-4. Urgency-Based Case Handling
-5. Case Update with Undo
-6. Case State Validation
-7. Case-Bound Messaging
-8. Document Access Control
-9. Follow-Up Scheduling
-10. Notification System
+2. Urgency-Based Case Handling
+3. Case Update with Undo
+4. Case State Validation
+5. Case-Bound Messaging
+6. Document Access Control
+7. Follow-Up Scheduling
+8. Notification System
 """
 
 from datetime import datetime, timedelta
@@ -179,7 +177,7 @@ class CaseManager:
     
     def get_lawyer_case_count(self, lawyer_id: str) -> int:
         """Count active (non-closed) cases for a lawyer"""
-        all_cases = list(self.case_store.cases.values())
+        all_cases = self.case_store.get_all_cases()
         return sum(1 for c in all_cases 
                     if c.get('lawyer_id') == lawyer_id 
                     and c.get('status') != 'closed')
@@ -189,7 +187,7 @@ class CaseManager:
         Find lawyer with matching speciality and capacity
         Lawyers can have multiple specialities (list)
         """
-        all_lawyers = [u for u in user_store.users.values() if u.get('role') == 'lawyer']
+        all_lawyers = [u for u in user_store.get_all_users() if u.get('role') == 'lawyer']
         
         for lawyer in all_lawyers:
             lawyer_specialities = lawyer.get('speciality', [])
@@ -238,130 +236,6 @@ class CaseManager:
         
         # All specialists busy
         return ('all_busy', None, None)
-
-
-
-class AppointmentManager:
-    """Handles appointment requests with queue-based processing"""
-    
-    def __init__(self):
-        self.normal_queue = Queue()  # Normal appointment requests
-        self.urgent_queue = PriorityQueue()  # Urgent appointment requests
-        self.appointments = {}  # appointment_id -> appointment data
-        self.lawyer_schedules = {}  # lawyer_id -> list of appointment times
-    
-    def request_appointment(self, case_id: str, client_id: str,
-                           preferred_datetime: str, urgency: bool) -> Dict:
-        """
-        Client requests appointment
-        Routes to normal or urgent queue
-        """
-        appointment_id = f"APT-{uuid.uuid4().hex[:8].upper()}"
-        
-        request_data = {
-            'appointment_id': appointment_id,
-            'case_id': case_id,
-            'client_id': client_id,
-            'preferred_datetime': preferred_datetime,
-            'status': 'pending',
-            'urgency': urgency,
-            'created_at': datetime.now().isoformat()
-        }
-        
-        # Route based on urgency
-        if urgency:
-            self.urgent_queue.enqueue(request_data, priority=1)
-        else:
-            self.normal_queue.enqueue(request_data)
-        
-        self.appointments[appointment_id] = request_data
-        
-        return request_data
-    
-    def get_next_request(self) -> Optional[Dict]:
-        """
-        Get next appointment request for lawyer to process
-        Urgent queue has priority
-        """
-        # Check urgent queue first
-        if not self.urgent_queue.is_empty():
-            return self.urgent_queue.dequeue()
-        
-        # Then normal queue
-        if not self.normal_queue.is_empty():
-            return self.normal_queue.dequeue()
-        
-        return None
-    
-    def check_conflict(self, lawyer_id: str, proposed_datetime: str) -> bool:
-        """
-        Check if proposed appointment conflicts with lawyer's schedule
-        Returns: True if conflict exists
-        """
-        if lawyer_id not in self.lawyer_schedules:
-            return False
-        
-        proposed_time = datetime.fromisoformat(proposed_datetime)
-        
-        for existing_time in self.lawyer_schedules[lawyer_id]:
-            existing = datetime.fromisoformat(existing_time)
-            # Check if within 1 hour window
-            time_diff = abs((existing - proposed_time).total_seconds() / 60)
-            if time_diff < 60:  # Conflict if within 60 minutes
-                return True
-        
-        return False
-    
-    def approve_appointment(self, appointment_id: str, lawyer_id: str,
-                           confirmed_datetime: str) -> Tuple[bool, str]:
-        """
-        Lawyer approves appointment
-        Checks for conflicts
-        """
-        if appointment_id not in self.appointments:
-            return False, "Appointment not found"
-        
-        # Check for conflicts
-        if self.check_conflict(lawyer_id, confirmed_datetime):
-            return False, "Time slot conflicts with existing appointment"
-        
-        # Approve
-        appointment = self.appointments[appointment_id]
-        appointment['status'] = 'approved'
-        appointment['confirmed_datetime'] = confirmed_datetime
-        appointment['lawyer_id'] = lawyer_id
-        
-        # Add to lawyer's schedule
-        if lawyer_id not in self.lawyer_schedules:
-            self.lawyer_schedules[lawyer_id] = []
-        self.lawyer_schedules[lawyer_id].append(confirmed_datetime)
-        
-        return True, "Appointment approved"
-    
-    def reject_appointment(self, appointment_id: str, reason: str) -> bool:
-        """Lawyer rejects appointment"""
-        if appointment_id not in self.appointments:
-            return False
-        
-        self.appointments[appointment_id]['status'] = 'rejected'
-        self.appointments[appointment_id]['rejection_reason'] = reason
-        return True
-    
-    def reschedule_appointment(self, appointment_id: str, 
-                              new_datetime: str) -> bool:
-        """Lawyer reschedules appointment"""
-        if appointment_id not in self.appointments:
-            return False
-        
-        self.appointments[appointment_id]['status'] = 'rescheduled'
-        self.appointments[appointment_id]['rescheduled_datetime'] = new_datetime
-        return True
-    
-    def get_pending_requests(self) -> List[Dict]:
-        """Get all pending requests (for display)"""
-        urgent = self.urgent_queue.get_all()
-        normal = self.normal_queue.get_all()
-        return urgent + normal
 
 
 class MessageManager:
