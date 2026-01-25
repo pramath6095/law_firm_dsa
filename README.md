@@ -126,187 +126,218 @@ docker-compose down
 
 ### Data Structures Implementation
 
-This system implements custom data structures from scratch to demonstrate their practical application in legal workflow management.
+> **⚠️ PURE DSA IMPLEMENTATION**: All data structures are implemented **without built-in Python shortcuts** (no `append()`, `pop()`, `len()`, `heapq`, or `dict`). Manual index tracking and custom algorithms used throughout.
 
-#### 1. **Queue (FIFO)** - First In, First Out
+---
+
+#### 1. **Stack (LIFO)** - Manual Top Index Tracking
+
+**Used For:**
+- Case status update undo functionality
+- State preservation before updates
+
+**Pure DSA Implementation:**
+```python
+class Stack:
+    def __init__(self, capacity=1000):
+        self.capacity = capacity
+        self.items = [None] * capacity  # Fixed-size array
+        self.top = -1  # -1 indicates empty stack
+    
+    def push(self, item):
+        """Add to top using index tracking"""
+        if self.top >= self.capacity - 1:
+            return False  # Overflow
+        self.top = self.top + 1
+        self.items[self.top] = item
+        return True
+    
+    def pop(self):
+        """Remove from top - NO built-in pop()"""
+        if self.top == -1:
+            return None  # Underflow
+        item = self.items[self.top]
+        self.items[self.top] = None
+        self.top = self.top - 1
+        return item
+    
+    def is_empty(self):
+        """Check empty using top index - NO len()"""
+        return self.top == -1
+```
+
+---
+
+#### 2. **Queue (FIFO)** - Circular Array Implementation
 
 **Used For:**
 - Message ordering (chronological preservation)
 - Notification delivery
 - Follow-up scheduling
 
-**Implementation:**
+**Pure DSA Implementation:**
 ```python
 class Queue:
-    def __init__(self):
-        self.items = []
+    def __init__(self, capacity=1000):
+        self.capacity = capacity
+        self.items = [None] * capacity  # Circular array
+        self.front = -1
+        self.rear = -1
+        self.count = 0
     
     def enqueue(self, item):
-        """Add to back"""
-        self.items.append(item)
+        """Add to rear - NO append()"""
+        if self.count >= self.capacity:
+            return False
+        if self.front == -1:
+            self.front = 0
+            self.rear = 0
+        else:
+            self.rear = (self.rear + 1) % self.capacity
+        self.items[self.rear] = item
+        self.count = self.count + 1
+        return True
     
     def dequeue(self):
-        """Remove from front"""
-        return self.items.pop(0)
-```
-
-**Usage Example (Messages):**
-```python
-class MessageManager:
-    def __init__(self):
-        self.case_messages = {}  # case_id -> Queue of messages
-    
-    def send_message(self, case_id, sender_id, content):
-        if case_id not in self.case_messages:
-            self.case_messages[case_id] = Queue()
-        
-        self.case_messages[case_id].enqueue({
-            'sender_id': sender_id,
-            'content': content,
-            'timestamp': datetime.now()
-        })
+        """Remove from front - NO pop(0)"""
+        if self.front == -1:
+            return None
+        item = self.items[self.front]
+        self.items[self.front] = None
+        self.count = self.count - 1
+        if self.count == 0:
+            self.front = -1
+            self.rear = -1
+        else:
+            self.front = (self.front + 1) % self.capacity
+        return item
 ```
 
 ---
 
-#### 2. **Priority Queue** - Priority-Based Processing
+#### 3. **Priority Queue** - Manual Heap with Heapify
 
 **Used For:**
 - Urgent case handling (cases with hearing ≤ 7 days)
 - Automatic prioritization without manual sorting
 - Available cases pool (lawyers see urgent cases first)
 
-**Implementation:**
+**Pure DSA Implementation:**
 ```python
 class PriorityQueue:
-    def __init__(self):
-        self.heap = []
+    def __init__(self, capacity=1000):
+        self.heap = [None] * capacity  # NO heapq module
+        self.heap_size = 0
         self.entry_counter = 0
     
+    def _parent(self, i): return (i - 1) // 2
+    def _left(self, i): return 2 * i + 1
+    def _right(self, i): return 2 * i + 2
+    
+    def _heapify_up(self, index):
+        """Manual bubble up after insert"""
+        while index > 0:
+            parent = self._parent(index)
+            if self.heap[index][0] < self.heap[parent][0]:
+                # Manual swap
+                temp = self.heap[index]
+                self.heap[index] = self.heap[parent]
+                self.heap[parent] = temp
+                index = parent
+            else:
+                break
+    
     def enqueue(self, item, priority):
-        """Priority 1 = urgent, Priority 2 = normal"""
+        """Insert with manual heapify - NO heappush()"""
         entry = (priority, self.entry_counter, item)
-        heapq.heappush(self.heap, entry)
-        self.entry_counter += 1
-    
-    def dequeue(self):
-        """Returns highest priority item first"""
-        priority, counter, item = heapq.heappop(self.heap)
-        return item
-```
-
-**Usage Example (Urgent Cases):**
-```python
-# Cases with hearing within 7 days automatically get urgency_level='urgent'
-if days_until_hearing <= 7:
-    case['urgency_level'] = 'urgent'
-    case['priority_score'] = days_until_hearing  # Lower = more urgent
-
-# Lawyer dashboard shows urgent cases first
-urgent_cases = [c for c in cases if c['urgency_level'] == 'urgent']
-urgent_cases.sort(key=lambda c: c['priority_score'])  # Sorted by priority
+        self.heap[self.heap_size] = entry
+        self._heapify_up(self.heap_size)
+        self.heap_size = self.heap_size + 1
+        self.entry_counter = self.entry_counter + 1
 ```
 
 ---
 
-#### 3. **Stack (LIFO)** - Last In, First Out
-
-**Used For:**
-- Case status update undo functionality
-- State preservation before updates
-
-**Implementation:**
-```python
-class Stack:
-    def __init__(self):
-        self.items = []
-    
-    def push(self, item):
-        """Add to top"""
-        self.items.append(item)
-    
-    def pop(self):
-        """Remove from top"""
-        return self.items.pop()
-```
-
-**Usage Example (Undo Case Updates):**
-```python
-class CaseManager:
-    def __init__(self):
-        self.case_history_stack = {}  # case_id -> Stack
-    
-    def update_case_status(self, case_id, new_status):
-        case = self.case_store.get_case(case_id)
-        
-        # PUSH current state before update
-        previous_state = {
-            'status': case['status'],
-            'updated_at': case['updated_at']
-        }
-        self.case_history_stack[case_id].push(previous_state)
-        
-        # Apply update
-        case['status'] = new_status
-    
-    def undo_case_update(self, case_id):
-        # POP last state to restore
-        previous = self.case_history_stack[case_id].pop()
-        case = self.case_store.get_case(case_id)
-        case['status'] = previous['status']
-        case['updated_at'] = previous['updated_at']
-```
-
----
-
-#### 4. **Hash Tables** - O(1) Lookups
+#### 4. **Hash Table** - Custom Hash Function with Linked List Chaining
 
 **Used For:**
 - User authentication (email → user data)
 - Case retrieval (case_id → case details)
 - Document access (doc_id → document metadata)
 
-**Implementation:**
+**Pure DSA Implementation:**
 ```python
-class UserStore:
-    def __init__(self):
-        self.users = {}  # email -> user data (Hash Table)
-        self.users_by_id = {}  # user_id -> user data
+class Node:
+    """Linked list node for chaining"""
+    def __init__(self, key, value):
+        self.key = key
+        self.value = value
+        self.next = None
+
+class HashTable:
+    def __init__(self, size=101):
+        self.size = size
+        self.table = [None] * size  # NO Python dict
     
-    def get_user_by_email(self, email):
-        """O(1) lookup by email"""
-        return self.users.get(email)
+    def _hash(self, key):
+        """Custom hash function - NO built-in hash()"""
+        hash_value = 0
+        position = 0
+        for char in key:
+            position = position + 1
+            hash_value = hash_value + (ord(char) * position)
+        return hash_value % self.size
+    
+    def put(self, key, value):
+        """Insert with chaining - NO dict assignment"""
+        index = self._hash(key)
+        # Check if key exists (update)
+        current = self.table[index]
+        while current is not None:
+            if current.key == key:
+                current.value = value
+                return
+            current = current.next
+        # Insert at head
+        new_node = Node(key, value)
+        new_node.next = self.table[index]
+        self.table[index] = new_node
+    
+    def get(self, key):
+        """Retrieve - NO dict.get()"""
+        index = self._hash(key)
+        current = self.table[index]
+        while current is not None:
+            if current.key == key:
+                return current.value
+            current = current.next
+        return None
 ```
 
-**Usage Example (Authentication):**
-```python
-@app.route('/api/auth/login', methods=['POST'])
-def login():
-    email = request.json.get('email')
-    password = request.json.get('password')
-    
-    # O(1) hash table lookup instead of O(n) loop
-    user = user_store.get_user_by_email(email)
-    
-    if user and user['password'] == password:
-        session['user_id'] = user['user_id']
-        return jsonify({'message': 'Login successful'})
-```
+---
 
-**Case Store Example:**
+#### 5. **Bubble Sort** - Manual Urgency Sorting
+
+**Used For:**
+- Sorting cases by priority_score (days until hearing)
+- Most urgent cases displayed first
+
+**Pure DSA Implementation:**
 ```python
-class CaseStore:
-    def __init__(self):
-        self.cases = {}  # case_id -> case_data (Hash Table)
-    
-    def get_case(self, case_id):
-        """O(1) direct access instead of searching array"""
-        return self.cases.get(case_id)
-    
-    def get_cases_by_lawyer(self, lawyer_id):
-        """Filter from hash table values"""
-        return [case for case in self.cases.values() 
-                if case['lawyer_id'] == lawyer_id]
+# Sort cases by urgency - NO built-in sort()
+n = 0
+for _ in cases:
+    n = n + 1  # Manual length count
+
+for i in range(n):
+    for j in range(0, n - i - 1):
+        score_j = cases[j].get('priority_score', 999)
+        score_j1 = cases[j + 1].get('priority_score', 999)
+        if score_j > score_j1:
+            # Manual swap
+            temp = cases[j]
+            cases[j] = cases[j + 1]
+            cases[j + 1] = temp
 ```
 
 ---
@@ -315,10 +346,11 @@ class CaseStore:
 
 | Data Structure | Why Chosen | Real-World Benefit |
 |---------------|------------|-------------------|
+| **Stack** | Legal data is sensitive - mistakes need reversibility | One-click undo for case updates |
 | **Queue** | Messages and notifications need FIFO processing | Chronological order preserved |
 | **Priority Queue** | Urgent cases need automatic prioritization | System enforces urgency, not manual sorting |
-| **Stack** | Legal data is sensitive - mistakes need reversibility | One-click undo for case updates |
-| **Hash Tables** | Fast lookups critical for authentication & case access | O(1) instead of O(n) - instant retrieval |
+| **Hash Table** | Fast lookups critical for authentication & case access | O(1) instead of O(n) - instant retrieval |
+| **Bubble Sort** | Display cases in urgency order | Most urgent cases shown first |
 
 ---
 
