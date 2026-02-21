@@ -1,9 +1,3 @@
-"""
-Flask Backend API for Legal Case Management System
-
-RESTful API endpoints for client and lawyer interfaces
-"""
-
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from functools import wraps
@@ -15,38 +9,36 @@ from data_structures import CaseStore, UserStore, DocumentStore
 from core_logic import (
     CaseManager, MessageManager,
     DocumentManager, FollowUpManager, NotificationManager,
-    EventManager
+    EventManager, AvailableCasesPool
 )
 
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
-# Session configuration - using Lax since nginx proxies make all requests same-origin
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 
-# Configure CORS (simplified since nginx proxies all /api requests)
 CORS(app, 
      origins=['http://localhost:8000', 'http://127.0.0.1:8000', 'http://localhost:5000', 'http://127.0.0.1:5000'],
      supports_credentials=True,
      allow_headers=['Content-Type', 'Authorization'],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 
-# Initialize data stores
+# data stores
 user_store = UserStore()
 case_store = CaseStore()
 document_store = DocumentStore()
 
-# Initialize managers
+# managers
 case_manager = CaseManager(case_store)
 message_manager = MessageManager()
 document_manager = DocumentManager(document_store, case_store)
 followup_manager = FollowUpManager()
 notification_manager = NotificationManager()
-event_manager = EventManager(case_store)  # Event manager
+event_manager = EventManager(case_store)
+available_cases_pool = AvailableCasesPool()
 
-# Firm contact information (for when all specialists are busy)
 FIRM_CONTACT_INFO = {
     'phone': '+1-555-LAW-FIRM',
     'email': 'contact@premierlegalpartners.com',
@@ -54,11 +46,7 @@ FIRM_CONTACT_INFO = {
 }
 
 
-# Create sample users for testing
 def init_sample_data():
-    """Initialize with 5 sample lawyers and 5 sample clients"""
-    
-    # Sample Lawyers with specialities and costs
     lawyers = [
         {
             "id": "LAWYER-001", 
@@ -105,11 +93,10 @@ def init_sample_data():
             'name': lawyer["name"],
             'phone': f'555-{lawyer["id"][-3:]}',
             'role': 'lawyer',
-            'speciality': lawyer["speciality"],  # List of specialities
+            'speciality': lawyer["speciality"],
             'cost_per_hearing': lawyer["cost_per_hearing"]
         })
     
-    # Sample Clients
     clients = [
         {"id": "CLIENT-001", "name": "John Doe", "email": "a@gmail.com"},
         {"id": "CLIENT-002", "name": "Jane Smith", "email": "b@gmail.com"},
@@ -131,7 +118,6 @@ def init_sample_data():
 init_sample_data()
 
 
-# Authentication decorator
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -142,29 +128,23 @@ def login_required(f):
 
 
 def role_required(role):
-    """Check if user has required role"""
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             if 'user_id' not in session:
                 return jsonify({'error': 'Authentication required'}), 401
-            
             user = user_store.get_user_by_id(session['user_id'])
             if not user or user.get('role') != role:
                 return jsonify({'error': 'Unauthorized'}), 403
-            
             return f(*args, **kwargs)
         return decorated_function
     return decorator
 
 
-# ============================================================================
-# AUTHENTICATION ENDPOINTS
-# ============================================================================
+# auth endpoints
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    """User/Lawyer login"""
     data = request.json
     email = data.get('email')
     password = data.get('password')
@@ -174,11 +154,9 @@ def login():
     
     user = user_store.get_user_by_email(email)
     
-    # Simple password check (in production, use proper hashing)
     if not user or user.get('password') != password:
         return jsonify({'error': 'Invalid credentials'}), 401
     
-    # Create session
     session['user_id'] = user['user_id']
     session['role'] = user['role']
     
@@ -195,32 +173,28 @@ def login():
 
 @app.route('/api/auth/signup', methods=['POST'])
 def signup():
-    """Client registration"""
     data = request.json
     
     required_fields = ['name', 'email', 'phone', 'password']
     if not all(field in data for field in required_fields):
         return jsonify({'error': 'All fields required'}), 400
     
-    # Check if email exists
     if user_store.email_exists(data['email']):
         return jsonify({'error': 'Email already registered'}), 400
     
-    # Create new client
     user_id = f"CLIENT-{uuid.uuid4().hex[:8].upper()}"
     user_data = {
         'user_id': user_id,
         'name': data['name'],
         'email': data['email'],
         'phone': data['phone'],
-        'password': data['password'],  # Hash in production!
+        'password': data['password'],
         'role': 'client',
         'created_at': datetime.now().isoformat()
     }
     
     user_store.add_user(user_id, data['email'], user_data)
     
-    # Auto-login
     session['user_id'] = user_id
     session['role'] = 'client'
     
@@ -237,7 +211,6 @@ def signup():
 
 @app.route('/api/auth/logout', methods=['POST'])
 def logout():
-    """Logout"""
     session.clear()
     return jsonify({'message': 'Logged out successfully'})
 
@@ -245,7 +218,6 @@ def logout():
 @app.route('/api/auth/me', methods=['GET'])
 @login_required
 def get_current_user():
-    """Get current logged-in user"""
     user = user_store.get_user_by_id(session['user_id'])
     if not user:
         return jsonify({'error': 'User not found'}), 404
@@ -261,7 +233,6 @@ def get_current_user():
 @app.route('/api/profile', methods=['GET', 'PUT'])
 @login_required
 def profile():
-    """Get or update user profile"""
     user_id = session['user_id']
     user = user_store.get_user_by_id(user_id)
     
@@ -269,7 +240,6 @@ def profile():
         return jsonify({'error': 'User not found'}), 404
     
     if request.method == 'GET':
-        # Return full profile
         profile_data = {
             'user_id': user['user_id'],
             'name': user['name'],
@@ -278,7 +248,6 @@ def profile():
             'role': user['role']
         }
         
-        # Add lawyer-specific fields
         if user['role'] == 'lawyer':
             profile_data['speciality'] = user.get('speciality', [])
             profile_data['cost_per_hearing'] = user.get('cost_per_hearing', 0)
@@ -286,24 +255,19 @@ def profile():
         return jsonify(profile_data)
     
     elif request.method == 'PUT':
-        # Update profile - modifies dictionary directly
         data = request.json
         
-        # Validation
         name = data.get('name', '').strip()
         phone = data.get('phone', '').strip()
         
         if not name or len(name) < 2:
             return jsonify({'error': 'Name must be at least 2 characters'}), 400
-        
         if not phone:
             return jsonify({'error': 'Phone number is required'}), 400
         
-        # Update the dictionary directly!
         user['name'] = name
         user['phone'] = phone
         
-        # Update speciality for lawyers
         if user['role'] == 'lawyer' and 'speciality' in data:
             speciality = data.get('speciality')
             if isinstance(speciality, list):
@@ -321,35 +285,26 @@ def profile():
         })
 
 
-
-# ============================================================================
-# CLIENT ENDPOINTS
-# ============================================================================
+# client endpoints
 
 @app.route('/api/client/dashboard', methods=['GET'])
 @login_required
 @role_required('client')
 def client_dashboard():
-    """Get client dashboard data"""
     client_id = session['user_id']
     
-    # Get active cases
     cases = case_store.get_cases_by_client(client_id)
     active_cases = [c for c in cases if c['status'] != 'closed']
     
-    # Get notifications
     notifications = notification_manager.get_notifications(client_id)
     unread_count = notification_manager.get_unread_count(client_id)
     
-    # Find next appointment (simplified)
     next_appointment = None
     for case in cases:
         case_id = case['case_id']
-        # This is simplified - in real app, query appointments
-        # For now, return placeholder
     
     return jsonify({
-        'active_cases': active_cases[:5],  # Show first 5
+        'active_cases': active_cases[:5],
         'total_cases': len(cases),
         'next_appointment': next_appointment,
         'unread_notifications': unread_count
@@ -358,10 +313,8 @@ def client_dashboard():
 
 @app.route('/api/lawyers', methods=['GET'])
 def get_lawyers():
-    """Get all lawyers with their specialities and costs"""
     all_lawyers = [u for u in user_store.get_all_users() if u.get('role') == 'lawyer']
     
-    # Add active case count for each lawyer
     lawyers_with_counts = []
     for lawyer in all_lawyers:
         lawyer_data = {
@@ -381,26 +334,20 @@ def get_lawyers():
 @login_required
 @role_required('client')
 def client_cases():
-    """Get all cases or create new case"""
     client_id = session['user_id']
     
     if request.method == 'GET':
         cases = case_store.get_cases_by_client(client_id)
         
-        # PURE DSA: Manual bubble sort by priority_score (lower = more urgent)
-        # No built-in sort() used - manual comparison and swapping
+        # bubble sort by priority_score (lower = more urgent)
         n = 0
         for _ in cases:
             n = n + 1
         
-        # Bubble sort: compare adjacent elements and swap if needed
         for i in range(n):
             for j in range(0, n - i - 1):
-                # Get priority scores (days until hearing)
                 score_j = cases[j].get('priority_score', 999)
                 score_j1 = cases[j + 1].get('priority_score', 999)
-                
-                # If current case is less urgent than next, swap
                 if score_j > score_j1:
                     temp = cases[j]
                     cases[j] = cases[j + 1]
@@ -413,16 +360,14 @@ def client_cases():
         
         case_type = data.get('case_type')
         description = data.get('description')
-        hearing_date = data.get('hearing_date')  # Required
-        selected_lawyer_id = data.get('lawyer_id')  # Required - client must select a lawyer
-        speciality = data.get('speciality')  # For fallback search
+        hearing_date = data.get('hearing_date')
+        selected_lawyer_id = data.get('lawyer_id')
+        speciality = data.get('speciality')
         
-        # Validation
         if not all([case_type, description, hearing_date, selected_lawyer_id, speciality]):
             return jsonify({'error': 'All fields required: case_type, description, hearing_date, lawyer_id, speciality'}), 400
         
-        # Validate description minimum 50 words (using string data type operations)
-        # Split description into words and count non-empty strings
+        # need at least 50 words in description
         words = [word for word in description.split() if word.strip()]
         word_count = len(words)
         
@@ -433,14 +378,12 @@ def client_cases():
                 'required': 50
             }), 400
         
-        # Attempt assignment with auto-fallback
         result_type, case, extra = case_manager.create_case_with_assignment(
             client_id, case_type, description, hearing_date,
             selected_lawyer_id, speciality, user_store
         )
         
         if result_type == 'success':
-            # Assigned to selected lawyer
             notification_manager.add_notification(
                 selected_lawyer_id, 'new_case_assigned',
                 f'New case assigned: {case["case_id"]} ({case["urgency_level"]} priority) - Hearing in {case["days_until_hearing"]} days',
@@ -454,7 +397,6 @@ def client_cases():
             }), 201
         
         elif result_type == 'auto_assigned':
-            # Assigned to alternative lawyer
             alternative_lawyer = extra
             notification_manager.add_notification(
                 alternative_lawyer['user_id'], 'new_case_assigned',
@@ -469,7 +411,7 @@ def client_cases():
                 'assignment_status': 'auto_assigned'
             }), 201
         
-        else:  # all_busy
+        else:
             return jsonify({
                 'error': 'all_specialists_busy',
                 'message': FIRM_CONTACT_INFO['message'],
@@ -477,18 +419,15 @@ def client_cases():
                     'phone': FIRM_CONTACT_INFO['phone'],
                     'email': FIRM_CONTACT_INFO['email']
                 }
-            }), 503  # Service Unavailable
-        
+            }), 503
 
 
 @app.route('/api/client/cases/<case_id>', methods=['GET'])
 @login_required
 @role_required('client')
 def get_case_details(case_id):
-    """Get case details"""
     client_id = session['user_id']
     
-    # Check access
     if not case_manager.check_access(case_id, client_id, 'client'):
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -496,7 +435,6 @@ def get_case_details(case_id):
     if not case:
         return jsonify({'error': 'Case not found'}), 404
     
-    # Get additional data
     messages = message_manager.get_messages(case_id)
     documents = document_store.get_documents_by_case(case_id)
     followups = followup_manager.get_followups(case_id)
@@ -509,15 +447,12 @@ def get_case_details(case_id):
     })
 
 
-
 @app.route('/api/client/cases/<case_id>/messages', methods=['GET', 'POST'])
 @login_required
 @role_required('client')
 def case_messages(case_id):
-    """Get or send messages for case"""
     client_id = session['user_id']
     
-    # Check access
     if not case_manager.check_access(case_id, client_id, 'client'):
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -534,7 +469,6 @@ def case_messages(case_id):
         
         message = message_manager.send_message(case_id, client_id, 'client', content)
         
-        # Notify lawyer
         case = case_store.get_case(case_id)
         if case and case.get('lawyer_id'):
             notification_manager.add_notification(
@@ -551,10 +485,8 @@ def case_messages(case_id):
 @login_required
 @role_required('client')
 def case_documents(case_id):
-    """Get or upload documents for case"""
     client_id = session['user_id']
     
-    # Check access
     if not case_manager.check_access(case_id, client_id, 'client'):
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -565,7 +497,7 @@ def case_documents(case_id):
     elif request.method == 'POST':
         data = request.json
         filename = data.get('filename')
-        file_path = data.get('file_path')  # In real app, handle file upload
+        file_path = data.get('file_path')
         
         if not filename:
             return jsonify({'error': 'Filename required'}), 400
@@ -574,7 +506,6 @@ def case_documents(case_id):
             case_id, client_id, filename, file_path or 'uploads/' + filename
         )
         
-        # Notify lawyer
         case = case_store.get_case(case_id)
         if case and case.get('lawyer_id'):
             notification_manager.add_notification(
@@ -587,29 +518,21 @@ def case_documents(case_id):
         return jsonify({'message': 'Document uploaded', 'document': document}), 201
 
 
-# ============================================================================
-# LAWYER ENDPOINTS
-# ============================================================================
+# lawyer endpoints
 
 @app.route('/api/lawyer/dashboard', methods=['GET'])
 @login_required
 @role_required('lawyer')
 def lawyer_dashboard():
-    """Get lawyer dashboard data"""
     lawyer_id = session['user_id']
     
-    # Get assigned cases
     cases = case_store.get_cases_by_lawyer(lawyer_id)
     
-    # Sort cases by days_until_hearing (ascending = most urgent first)
-    # Filter cases with urgency_level in ('urgent', 'high', 'normal')
     cases_with_hearings = [c for c in cases if c.get('days_until_hearing') is not None]
     cases_with_hearings.sort(key=lambda c: c.get('priority_score', 999))
     
-    # Get urgent cases (for display) - cases with hearing ≤7 days
     urgent_cases = [c for c in cases_with_hearings if c.get('urgency_level') == 'urgent']
     
-    # Get notifications
     notifications = notification_manager.get_notifications(lawyer_id)
     unread_count = notification_manager.get_unread_count(lawyer_id)
     
@@ -617,16 +540,14 @@ def lawyer_dashboard():
         'total_cases': len(cases),
         'urgent_cases_count': len(urgent_cases),
         'unread_notifications': unread_count,
-        'urgent_cases': urgent_cases[:5]  # Top 5 most urgent
+        'urgent_cases': urgent_cases[:5]
     })
-
 
 
 @app.route('/api/lawyer/cases', methods=['GET'])
 @login_required
 @role_required('lawyer')
 def lawyer_cases():
-    """Get all assigned cases"""
     lawyer_id = session['user_id']
     cases = case_store.get_cases_by_lawyer(lawyer_id)
     return jsonify({'cases': cases})
@@ -636,10 +557,8 @@ def lawyer_cases():
 @login_required
 @role_required('lawyer')
 def lawyer_get_case(case_id):
-    """Get case details"""
     lawyer_id = session['user_id']
     
-    # Check access
     if not case_manager.check_access(case_id, lawyer_id, 'lawyer'):
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -647,7 +566,6 @@ def lawyer_get_case(case_id):
     if not case:
         return jsonify({'error': 'Case not found'}), 404
     
-    # Get additional data
     messages = message_manager.get_messages(case_id)
     documents = document_store.get_documents_by_case(case_id)
     followups = followup_manager.get_followups(case_id)
@@ -664,10 +582,8 @@ def lawyer_get_case(case_id):
 @login_required
 @role_required('lawyer')
 def update_case(case_id):
-    """Update case status"""
     lawyer_id = session['user_id']
     
-    # Check access
     if not case_manager.check_access(case_id, lawyer_id, 'lawyer'):
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -685,7 +601,6 @@ def update_case(case_id):
     if not success:
         return jsonify({'error': message}), 400
     
-    # Notify client
     case = case_store.get_case(case_id)
     if case:
         notification_manager.add_notification(
@@ -702,10 +617,8 @@ def update_case(case_id):
 @login_required
 @role_required('lawyer')
 def undo_case_update(case_id):
-    """Undo last case update"""
     lawyer_id = session['user_id']
     
-    # Check access
     if not case_manager.check_access(case_id, lawyer_id, 'lawyer'):
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -721,15 +634,13 @@ def undo_case_update(case_id):
 @login_required
 @role_required('lawyer')
 def schedule_followup(case_id):
-    """Schedule follow-up or hearing"""
     lawyer_id = session['user_id']
     
-    # Check access
     if not case_manager.check_access(case_id, lawyer_id, 'lawyer'):
         return jsonify({'error': 'Unauthorized'}), 403
     
     data = request.json
-    followup_type = data.get('type')  # 'consultation' or 'hearing'
+    followup_type = data.get('type')
     scheduled_date = data.get('scheduled_date')
     notes = data.get('notes', '')
     
@@ -740,7 +651,6 @@ def schedule_followup(case_id):
         case_id, lawyer_id, followup_type, scheduled_date, notes
     )
     
-    # Add to calendar as an event
     case = case_store.get_case(case_id)
     if case:
         event_manager.add_event(
@@ -751,7 +661,6 @@ def schedule_followup(case_id):
             created_by=lawyer_id
         )
         
-        # Notify client
         notification_manager.add_notification(
             case['client_id'],
             'followup_scheduled',
@@ -766,10 +675,8 @@ def schedule_followup(case_id):
 @login_required
 @role_required('lawyer')
 def lawyer_case_messages(case_id):
-    """Get or send messages for case (lawyer endpoint)"""
     lawyer_id = session['user_id']
     
-    # Check access
     if not case_manager.check_access(case_id, lawyer_id, 'lawyer'):
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -786,7 +693,6 @@ def lawyer_case_messages(case_id):
         
         message = message_manager.send_message(case_id, lawyer_id, 'lawyer', content)
         
-        # Notify client
         case = case_store.get_case(case_id)
         if case:
             notification_manager.add_notification(
@@ -799,12 +705,12 @@ def lawyer_case_messages(case_id):
         return jsonify({'message': 'Message sent', 'data': message}), 201
 
 
-# NEW: Available Cases Pool Endpoints
+# available cases pool endpoints
+
 @app.route('/api/lawyer/available-cases', methods=['GET'])
 @login_required
 @role_required('lawyer')
 def get_available_cases():
-    """Get all available cases in the pool"""
     available = available_cases_pool.get_available_cases()
     lawyer_id = session['user_id']
     case_count = available_cases_pool.get_lawyer_case_count(lawyer_id)
@@ -820,10 +726,8 @@ def get_available_cases():
 @login_required
 @role_required('lawyer')
 def get_pending_direct_requests():
-    """Get pending direct assignment requests for this lawyer"""
     lawyer_id = session['user_id']
     requests = available_cases_pool.get_pending_requests(lawyer_id)
-    
     return jsonify({'requests': requests})
 
 
@@ -831,7 +735,6 @@ def get_pending_direct_requests():
 @login_required
 @role_required('lawyer')
 def claim_case(case_id):
-    """Claim a case from available pool"""
     lawyer_id = session['user_id']
     
     success, message = available_cases_pool.claim_case(case_id, lawyer_id)
@@ -839,17 +742,14 @@ def claim_case(case_id):
     if not success:
         return jsonify({'error': message}), 400
     
-    # Update case store with lawyer assignment
     case_manager.assign_lawyer(case_id, lawyer_id)
     
-    # Update case status to 'in_review' when claimed
     case = case_store.get_case(case_id)
     if case and case['status'] == 'created':
         case['status'] = 'in_review'
         case['updated_at'] = datetime.now().isoformat()
         case_store.cases[case_id] = case
     
-    # Notify client
     if case:
         notification_manager.add_notification(
             case['client_id'],
@@ -865,10 +765,8 @@ def claim_case(case_id):
 @login_required
 @role_required('lawyer')
 def unclaim_case(case_id):
-    """Un-claim a case, return it to pool"""
     lawyer_id = session['user_id']
     
-    # Check if lawyer owns this case
     if not case_manager.check_access(case_id, lawyer_id, 'lawyer'):
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -881,16 +779,13 @@ def unclaim_case(case_id):
     if not success:
         return jsonify({'error': 'Cannot unclaim case'}), 400
     
-    # Remove lawyer assignment
     case_manager.assign_lawyer(case_id, None)
     
-    # Reset status back to 'created'
     if case['status'] == 'in_review':
         case['status'] = 'created'
         case['updated_at'] = datetime.now().isoformat()
         case_store.cases[case_id] = case
     
-    # Notify client
     notification_manager.add_notification(
         case['client_id'],
         'case_unclaimed',
@@ -905,7 +800,6 @@ def unclaim_case(case_id):
 @login_required
 @role_required('lawyer')
 def accept_direct_request(case_id):
-    """Accept a direct assignment request"""
     lawyer_id = session['user_id']
     
     success, message = available_cases_pool.accept_direct_request(case_id, lawyer_id)
@@ -913,10 +807,8 @@ def accept_direct_request(case_id):
     if not success:
         return jsonify({'error': message}), 400
     
-    # Update case store
     case_manager.assign_lawyer(case_id, lawyer_id)
     
-    # Notify client
     case = case_store.get_case(case_id)
     if case:
         notification_manager.add_notification(
@@ -933,7 +825,6 @@ def accept_direct_request(case_id):
 @login_required
 @role_required('lawyer')
 def reject_direct_request(case_id):
-    """Reject direct request - goes to general pool"""
     lawyer_id = session['user_id']
     
     case = case_store.get_case(case_id)
@@ -945,7 +836,6 @@ def reject_direct_request(case_id):
     if not success:
         return jsonify({'error': 'Cannot reject request'}), 400
     
-    # Notify client
     notification_manager.add_notification(
         case['client_id'],
         'request_rejected',
@@ -956,11 +846,9 @@ def reject_direct_request(case_id):
     return jsonify({'message': 'Request rejected, case moved to general pool'})
 
 
-# NEW: Get all lawyers endpoint for client
 @app.route('/api/lawyers', methods=['GET'])
 @login_required
 def get_all_lawyers():
-    """Get list of all lawyers for selection"""
     all_users = user_store.get_all_users()
     lawyers = [
         {
@@ -973,27 +861,13 @@ def get_all_lawyers():
     return jsonify({'lawyers': lawyers})
 
 
-# ============================================================================
-# ANALYTICS ENDPOINTS
-# ============================================================================
-
-@app.route('/api/analytics/queue-stats', methods=['GET'])
-@login_required
-def queue_stats():
-    """Get queue statistics"""
-    return jsonify({
-        'normal_queue_length': appointment_manager.normal_queue.size(),
-        'urgent_queue_length': appointment_manager.urgent_queue.size(),
-        'total_pending': appointment_manager.normal_queue.size() + 
-                        appointment_manager.urgent_queue.size()
-    })
+# analytics
 
 
 @app.route('/api/analytics/urgency-distribution', methods=['GET'])
 @login_required
 def urgency_distribution():
-    """Get urgency distribution"""
-    all_cases = list(case_store.cases.values())
+    all_cases = case_store.get_all_cases()
     urgent_count = sum(1 for c in all_cases if c.get('urgency'))
     normal_count = len(all_cases) - urgent_count
     
@@ -1005,18 +879,14 @@ def urgency_distribution():
     })
 
 
-# ============================================================================
-# CALENDAR AND EVENT MANAGEMENT ENDPOINTS
-# ============================================================================
+# calendar
 
 @app.route('/api/calendar/week', methods=['GET'])
 @login_required
 def get_weekly_calendar():
-    """Get all events for the current week"""
     user_id = session['user_id']
     role = session['role']
     
-    # Optional: specify week start date
     start_date_str = request.args.get('start_date')
     start_date = datetime.fromisoformat(start_date_str) if start_date_str else None
     
@@ -1032,11 +902,9 @@ def get_weekly_calendar():
 @login_required
 @role_required('lawyer')
 def create_event(case_id):
-    """Lawyer creates hearing/appointment/follow-up"""
     data = request.json
     lawyer_id = session['user_id']
     
-    # Check lawyer owns this case
     if not case_manager.check_access(case_id, lawyer_id, 'lawyer'):
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -1058,10 +926,6 @@ def create_event(case_id):
     
     return jsonify({'event': event}), 201
 
-
-# ============================================================================
-# START SERVER
-# ============================================================================
 
 if __name__ == '__main__':
     print("Legal Case Management System - Backend")
