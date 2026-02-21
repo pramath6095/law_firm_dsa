@@ -1,4 +1,4 @@
-# Legal Case Management System
+# Law Firm Management System
 
 A case management tool for law firms, built with Flask and vanilla HTML/CSS/JS. Clients can file cases, choose lawyers, and communicate through the portal. Lawyers can manage their caseload, update case statuses, and schedule follow-ups.
 
