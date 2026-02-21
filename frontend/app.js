@@ -1,12 +1,6 @@
-/**
- * Shared JavaScript utilities for Legal Case Management System
- * Handles API communication, session management, and utilities
- */
-
-// Use relative URL to go through nginx proxy (same-origin)
+// shared utilities for the legal case management system
 const API_BASE_URL = '/api';
 
-// Session management
 class Session {
     static getUser() {
         const user = localStorage.getItem('user');
@@ -31,7 +25,6 @@ class Session {
     }
 }
 
-// API communication
 class API {
     static async request(endpoint, options = {}) {
         const defaultOptions = {
@@ -52,11 +45,10 @@ class API {
             const data = await response.json();
 
             if (!response.ok) {
-                // For 503 (all busy), preserve the full error data
                 if (response.status === 503) {
                     const error = new Error(data.error || 'Service Unavailable');
                     error.statusCode = 503;
-                    error.data = data; // Preserve contact info
+                    error.data = data;
                     throw error;
                 }
                 throw new Error(data.error || 'Request failed');
@@ -69,7 +61,6 @@ class API {
         }
     }
 
-    // Authentication
     static async login(email, password) {
         return await this.request('/auth/login', {
             method: 'POST',
@@ -92,7 +83,6 @@ class API {
         return await this.request('/auth/me');
     }
 
-    // Client endpoints
     static async getClientDashboard() {
         return await this.request('/client/dashboard');
     }
@@ -120,13 +110,6 @@ class API {
         return await this.request(`/client/cases/${caseId}`);
     }
 
-    static async requestAppointment(caseId, preferredDatetime) {
-        return await this.request(`/client/cases/${caseId}/appointments`, {
-            method: 'POST',
-            body: { preferred_datetime: preferredDatetime }
-        });
-    }
-
     static async getCaseMessages(caseId) {
         return await this.request(`/client/cases/${caseId}/messages`);
     }
@@ -149,34 +132,8 @@ class API {
         });
     }
 
-    // Lawyer endpoints
     static async getLawyerDashboard() {
         return await this.request('/lawyer/dashboard');
-    }
-
-    static async getConsultationRequests() {
-        return await this.request('/lawyer/consultation-requests');
-    }
-
-    static async approveAppointment(appointmentId, confirmedDatetime) {
-        return await this.request(`/lawyer/appointments/${appointmentId}/approve`, {
-            method: 'POST',
-            body: { confirmed_datetime: confirmedDatetime }
-        });
-    }
-
-    static async rejectAppointment(appointmentId, reason) {
-        return await this.request(`/lawyer/appointments/${appointmentId}/reject`, {
-            method: 'POST',
-            body: { reason }
-        });
-    }
-
-    static async rescheduleAppointment(appointmentId, newDatetime) {
-        return await this.request(`/lawyer/appointments/${appointmentId}/reschedule`, {
-            method: 'POST',
-            body: { new_datetime: newDatetime }
-        });
     }
 
     static async getLawyerCases() {
@@ -214,7 +171,6 @@ class API {
         });
     }
 
-    // NEW: Law Firm Portal Endpoints
     static async getAllLawyers() {
         return await this.request('/lawyers');
     }
@@ -251,7 +207,6 @@ class API {
         });
     }
 
-    // Analytics
     static async getQueueStats() {
         return await this.request('/analytics/queue-stats');
     }
@@ -261,7 +216,6 @@ class API {
     }
 }
 
-// Utility functions
 function showAlert(message, type = 'info') {
     const alertDiv = document.createElement('div');
     alertDiv.className = `alert alert-${type}`;
@@ -288,7 +242,6 @@ function formatStatus(status) {
     return status.replace('_', ' ').toUpperCase();
 }
 
-// Tab management
 function initTabs() {
     const tabs = document.querySelectorAll('.tab');
     const tabContents = document.querySelectorAll('.tab-content');
@@ -306,12 +259,10 @@ function initTabs() {
     });
 }
 
-// Auth check redirect
 function requireAuth(allowedRole = null) {
     const user = Session.getUser();
 
     if (!user) {
-        // Not logged in - redirect to client login
         if (window.location.pathname.includes('/lawyer/')) {
             window.location.href = '../lawyer/login.html';
         } else {
@@ -321,7 +272,6 @@ function requireAuth(allowedRole = null) {
     }
 
     if (allowedRole && user.role !== allowedRole) {
-        // Wrong role - redirect to correct portal
         if (user.role === 'lawyer') {
             window.location.href = '../lawyer/dashboard.html';
         } else {
@@ -333,7 +283,6 @@ function requireAuth(allowedRole = null) {
     return true;
 }
 
-// Logout
 async function handleLogout() {
     try {
         await API.logout();
@@ -341,7 +290,6 @@ async function handleLogout() {
         window.location.href = '../client/login.html';
     } catch (error) {
         console.error('Logout error:', error);
-        // Force logout anyway
         Session.clearUser();
         window.location.href = '../client/login.html';
     }

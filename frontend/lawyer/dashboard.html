@@ -284,9 +284,11 @@
 
         loadDashboard();
 
-        // Calendar functionality
+        // Calendar functionality - start from Monday of current week
         let currentWeekStart = new Date();
-        currentWeekStart.setDate(currentWeekStart.getDate() - currentWeekStart.getDay());
+        const dayOfWeek = currentWeekStart.getDay();
+        const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Sunday goes back 6, others go back to Monday
+        currentWeekStart.setDate(currentWeekStart.getDate() + diff);
 
         async function loadWeeklyCalendar() {
             try {
@@ -325,8 +327,8 @@
 
                 days.forEach((day, index) => {
                     const dayDate = new Date(currentWeekStart);
-                    // Sunday is 0, Monday is 1, etc. Adjust index for Monday-first week
-                    dayDate.setDate(dayDate.getDate() + (index + 1) % 7);
+                    // Monday is index 0, Sunday is index 6
+                    dayDate.setDate(dayDate.getDate() + index);
 
                     const dayEvents = eventsByDay[day] || [];
 

@@ -1,7 +1,4 @@
-/* 
-Legal Case Management System - Styles
-Clean, functional styling with case-centric layout
-*/
+/* global styles */
 
 * {
     margin: 0;
@@ -11,38 +8,24 @@ Clean, functional styling with case-centric layout
 
 :root {
     --primary-color: #60a5fa;
-    /* Lighter blue for better visibility */
     --secondary-color: #3b82f6;
     --success-color: #34d399;
-    /* Brighter green */
     --warning-color: #fbbf24;
-    /* Brighter yellow/orange */
     --danger-color: #f87171;
-    /* Brighter red */
     --urgent-color: #ef4444;
-    /* Bright urgent red */
     --bg-light: #0f172a;
-    /* Deep dark blue-gray for main background */
     --bg-white: #1e293b;
-    /* Lighter slate for cards - better contrast */
     --text-dark: #f1f5f9;
-    /* Very light gray - high contrast for main text */
     --text-gray: #cbd5e1;
-    /* Light gray for secondary text - still readable */
     --border-color: #334155;
-    /* Medium slate for borders - visible but not harsh */
     --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-    /* Slightly stronger shadow */
     --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.6);
-    /* Deeper shadow for elevation */
 }
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: var(--bg-light);
-    /* Updated to use dark theme variable */
     color: var(--text-dark);
-    /* Updated to use dark theme variable */
     line-height: 1.6;
 }
 
@@ -52,7 +35,7 @@ body {
     padding: 20px;
 }
 
-/* Authentication Pages */
+/* auth pages */
 .auth-page {
     min-height: 100vh;
     display: flex;
@@ -76,7 +59,7 @@ body {
     margin-bottom: 30px;
 }
 
-/* Header */
+/* header */
 .header {
     background: var(--bg-white);
     border-bottom: 1px solid var(--border-color);
@@ -117,7 +100,7 @@ body {
     color: var(--primary-color);
 }
 
-/* Forms */
+/* forms */
 .form-group {
     margin-bottom: 20px;
 }
@@ -162,7 +145,7 @@ body {
     width: auto;
 }
 
-/* Buttons */
+/* buttons */
 .btn {
     padding: 12px 24px;
     border: none;
@@ -179,7 +162,6 @@ body {
 .btn-primary {
     background-color: var(--primary-color);
     color: #0f172a;
-    /* Dark text on bright button for maximum contrast */
     font-weight: 600;
 }
 
@@ -190,7 +172,6 @@ body {
 
 .btn-secondary {
     background-color: #475569;
-    /* Lighter gray for visibility */
     color: var(--text-dark);
 }
 
@@ -207,7 +188,7 @@ body {
     gap: 10px;
 }
 
-/* Cards */
+/* cards */
 .card {
     background: var(--bg-white);
     border-radius: 8px;
@@ -228,7 +209,7 @@ body {
     margin-bottom: 30px;
 }
 
-/* Case Items */
+/* case items */
 .case-item {
     border: 1px solid var(--border-color);
     border-radius: 8px;
@@ -286,7 +267,7 @@ body {
     color: #374151;
 }
 
-/* Tabs */
+/* tabs */
 .tabs {
     display: flex;
     gap: 10px;
@@ -319,7 +300,7 @@ body {
     display: block;
 }
 
-/* Messages */
+/* messages */
 .messages-container {
     max-height: 400px;
     overflow-y: auto;
@@ -362,7 +343,7 @@ body {
     margin-top: 4px;
 }
 
-/* Documents */
+/* documents */
 .document-list {
     list-style: none;
 }
@@ -386,7 +367,7 @@ body {
     color: var(--text-gray);
 }
 
-/* Notifications */
+/* notifications */
 .notification-badge {
     background-color: var(--danger-color);
     color: white;
@@ -397,7 +378,7 @@ body {
     margin-left: 5px;
 }
 
-/* Alerts */
+/* alerts */
 .alert {
     padding: 12px 16px;
     border-radius: 6px;
@@ -422,23 +403,11 @@ body {
     border-left: 4px solid var(--primary-color);
 }
 
-/* Utilities */
-.text-center {
-    text-align: center;
-}
-
-.text-muted {
-    color: var(--text-gray);
-    /* Bright readable gray instead of dim */
-}
-
-.mt-2 {
-    margin-top: 20px;
-}
-
-.mb-2 {
-    margin-bottom: 20px;
-}
+/* utilities */
+.text-center { text-align: center; }
+.text-muted { color: var(--text-gray); }
+.mt-2 { margin-top: 20px; }
+.mb-2 { margin-bottom: 20px; }
 
 .urgent-badge {
     background-color: var(--urgent-color);
@@ -454,12 +423,10 @@ body {
     text-align: center;
     padding: 40px;
     color: var(--text-dark);
-    /* Bright text for empty states */
 }
 
 .loading {
     text-align: center;
     padding: 40px;
     color: var(--text-dark);
-    /* Bright text for loading states */
 }

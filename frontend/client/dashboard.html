@@ -247,7 +247,10 @@
 
         const user = Session.getUser();
         let currentWeekStart = new Date();
-        currentWeekStart.setDate(currentWeekStart.getDate() - currentWeekStart.getDay()); // Start of week (Sunday)
+        // Set to Monday of current week (getDay: 0=Sun, 1=Mon, ..., 6=Sat)
+        const dayOfWeek = currentWeekStart.getDay();
+        const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Sunday goes back 6, others go back to Monday
+        currentWeekStart.setDate(currentWeekStart.getDate() + diff);
 
         document.getElementById('user-welcome').innerHTML = `
             <h2>Welcome, ${user.name}</h2>
@@ -328,8 +331,8 @@
 
             days.forEach((day, index) => {
                 const dayDate = new Date(currentWeekStart);
-                // Sunday is 0, Monday is 1, etc. Adjust index for Monday-first week
-                dayDate.setDate(dayDate.getDate() + (index + 1) % 7);
+                // Monday is index 0, Sunday is index 6
+                dayDate.setDate(dayDate.getDate() + index);
 
                 const dayEvents = eventsByDay[day] || [];
 
